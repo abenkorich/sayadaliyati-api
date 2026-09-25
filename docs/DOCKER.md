@@ -4,8 +4,8 @@
 
 ```sh
 docker build --target runtime -t sayadaliyati-api:dev .
-cp .env.docker.example .env.docker
-# Fill in the runtime database, Redis and authentication settings.
+# Supply DATABASE_URL, REDIS_URL and AUTH_SECRET through exported server variables
+# or your deployment platform’s runtime environment settings.
 docker compose -f compose.api.yml up -d
 ```
 
@@ -42,7 +42,7 @@ For a host bind mount instead, provision a directory owned by UID/GID 1000 and u
 sudo install -d -o 1000 -g 1000 -m 0750 /srv/sayadaliyati/dev_data
 docker run -d --name sayadaliyati-api --init \
   --restart unless-stopped \
-  --env-file .env.docker \
+  -e DATABASE_URL -e REDIS_URL -e AUTH_SECRET \
   -p 127.0.0.1:3000:3000 \
   --mount type=bind,src=/srv/sayadaliyati/dev_data,dst=/usr/src/app/dev_data \
   sayadaliyati-api:dev
@@ -53,14 +53,21 @@ and fails clearly when the mounted directory is not writable; it never recursive
 changes ownership of your host files. A bind mount masks directories from the
 image, so its host permissions must be correct before starting.
 
-## Configuration files
+## Runtime environment
 
-You can optionally place `api.env` at `dev_data/config/api.env`. Both the default
-API command and Compose worker command load it with Node's env-file option. Values
-already supplied through the container environment take precedence. Changes take
-effect on restart. Keep credentials readable only by the required operator and
-container user; for example owner UID 1000, mode 0600 for api.env. Other config
-files are retained but are not automatically interpreted by the API.
+The API and worker read configuration only from their container environment.
+No api.env or .env.docker file is loaded or required. Set DATABASE_URL, REDIS_URL
+and AUTH_SECRET in your deployment platform's runtime variables, or export them
+in the shell running Docker Compose. Host variables must be explicitly passed
+into containers; compose.api.yml forwards these values and fails clearly if a
+required variable is missing. Optional DOCUMENT_STORAGE_* variables are forwarded
+when defined; configure the complete storage group to enable attachments.
+
+The Docker image defaults NODE_ENV=production, HOST=0.0.0.0 and PORT=3000.
+The config/ directory remains available for retained files, but its contents are
+not automatically read. An old config/api.env file has no effect. Restart/redeploy
+the containers after changing server variables. .env.docker.example is a reference
+list of variables only; creating a matching file is unnecessary.
 
 Actual .env files, private key files, dev_data, host dependencies and host build
 artifacts are excluded from the Docker context. The runtime image contains compiled
@@ -73,10 +80,10 @@ Build the explicit tooling target for one-off schema deployment:
 
 ```sh
 docker build --target migrate -t sayadaliyati-api:migrate .
-docker run --rm --env-file /secure/path/migration.env sayadaliyati-api:migrate
+docker run --rm -e MIGRATION_DATABASE_URL sayadaliyati-api:migrate
 ```
 
-migration.env must supply MIGRATION_DATABASE_URL with migration privileges. Grant
+Export MIGRATION_DATABASE_URL with migration privileges for this one-off command. Grant
 the application role its scoped runtime privileges separately; the local grant
 script intentionally refuses remote databases. Do not pass migration credentials
 to the running API or worker. Apply migrations before expecting readiness to pass.

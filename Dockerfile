@@ -23,7 +23,8 @@ RUN --mount=type=cache,id=sayadaliyati-pnpm,target=/usr/src/app/.pnpm-store \
 
 # Optional one-off migration image; never run migrations on every API startup.
 FROM build AS migrate
-CMD ["pnpm", "db:migrate"]
+WORKDIR /usr/src/app/packages/database
+CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 
 FROM base AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DEV_DATA_DIR=/usr/src/app/dev_data
@@ -38,4 +39,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/v1/health/ready',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["api-entrypoint"]
-CMD ["node", "--env-file-if-exists=/usr/src/app/dev_data/config/api.env", "dist/main.js"]
+CMD ["node", "dist/main.js"]

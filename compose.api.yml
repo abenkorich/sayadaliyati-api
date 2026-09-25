@@ -7,9 +7,16 @@ services:
     image: sayadaliyati-api:dev
     init: true
     restart: unless-stopped
-    env_file: .env.docker
     environment:
       NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the server environment}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in the server environment}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the server environment}
+      DOCUMENT_STORAGE_ENDPOINT:
+      DOCUMENT_STORAGE_BUCKET:
+      DOCUMENT_STORAGE_REGION:
+      DOCUMENT_STORAGE_ACCESS_KEY:
+      DOCUMENT_STORAGE_SECRET_KEY:
       HOST: 0.0.0.0
       PORT: 3000
     ports:
@@ -21,15 +28,17 @@ services:
     image: sayadaliyati-api:dev
     init: true
     restart: unless-stopped
-    env_file: .env.docker
     environment:
       NODE_ENV: production
-    command:
-      [
-        'node',
-        '--env-file-if-exists=/usr/src/app/dev_data/config/api.env',
-        'dist/reminders/main.js',
-      ]
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the server environment}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in the server environment}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the server environment}
+      DOCUMENT_STORAGE_ENDPOINT:
+      DOCUMENT_STORAGE_BUCKET:
+      DOCUMENT_STORAGE_REGION:
+      DOCUMENT_STORAGE_ACCESS_KEY:
+      DOCUMENT_STORAGE_SECRET_KEY:
+    command: ['node', 'dist/reminders/main.js']
     volumes:
       - dev_data:/usr/src/app/dev_data
     healthcheck:
