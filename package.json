@@ -1,0 +1,46 @@
+{
+  "name": "sayadaliyati-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "24.21.0",
+    "pnpm": "11.24.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json && pnpm -r --if-present typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write package.json pnpm-workspace.yaml tsconfig.json eslint.config.mjs .prettierrc.json docker-compose.yml apps packages scripts docs/BOOTSTRAP.md docs/API-DATABASE-FOUNDATION.md docs/decisions/authentication.md docs/AUTHENTICATION.md docs/MEDICINE-CATALOG.md docs/PATIENT-INVENTORY.md docs/PRESCRIPTION-DRAFTS.md docs/PRESCRIPTION-DOCUMENTS.md docs/NOTIFICATION-PREFERENCES.md docs/TREATMENTS.md docs/REMINDERS.md docs/ANDROID.md",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml tsconfig.json eslint.config.mjs .prettierrc.json docker-compose.yml apps packages scripts docs/BOOTSTRAP.md docs/API-DATABASE-FOUNDATION.md docs/decisions/authentication.md docs/AUTHENTICATION.md docs/MEDICINE-CATALOG.md docs/PATIENT-INVENTORY.md docs/PRESCRIPTION-DRAFTS.md docs/PRESCRIPTION-DOCUMENTS.md docs/NOTIFICATION-PREFERENCES.md docs/TREATMENTS.md docs/REMINDERS.md docs/ANDROID.md",
+    "metadata:check": "node scripts/spec-metadata.mjs",
+    "metadata:update": "node scripts/spec-metadata.mjs --write",
+    "check": "pnpm build && pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test && pnpm metadata:check",
+    "build": "pnpm -r --if-present build",
+    "setup:local": "node scripts/setup-local.mjs",
+    "db:up": "docker compose up -d --wait postgres redis",
+    "db:stop": "docker compose stop postgres redis",
+    "db:migrate": "node --env-file-if-exists=.env scripts/database-command.mjs migrate",
+    "db:status": "node --env-file-if-exists=.env scripts/database-command.mjs status",
+    "db:check": "pnpm --filter @saydaliyati/database schema:check",
+    "api:start": "pnpm --filter @saydaliyati/api start",
+    "openapi:generate": "pnpm --filter @saydaliyati/api openapi:generate",
+    "test": "pnpm --filter @saydaliyati/api test",
+    "test:integration": "node --env-file-if-exists=.env scripts/database-integration.mjs",
+    "db:grant-local": "node --env-file-if-exists=.env scripts/database-command.mjs grant",
+    "db:seed-catalog": "node --env-file-if-exists=.env scripts/database-command.mjs seed-catalog",
+    "storage:up": "docker compose --profile documents up -d --build minio",
+    "storage:init": "pnpm --filter @saydaliyati/api storage:init",
+    "storage:stop": "docker compose --profile documents stop minio",
+    "worker:start": "pnpm --filter @saydaliyati/api worker:start",
+    "start": "pnpm --filter @saydaliyati/api start"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.6",
+    "eslint": "10.11.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1"
+  }
+}

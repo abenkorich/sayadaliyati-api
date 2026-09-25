@@ -1,0 +1,588 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  PHARMACY
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+  PENDING_VERIFICATION
+
+  @@map("user_status")
+}
+
+enum LanguageCode {
+  EN
+  FR
+  AR
+
+  @@map("language_code")
+}
+
+model User {
+  notifications           Notification[]
+  treatments              Treatment[]
+  medicationOccurrences   MedicationOccurrence[]
+  medicationEvents        MedicationEvent[]
+  id                      String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                   String?                      @unique(map: "users_email_unique") @db.VarChar(320)
+  phone                   String?                      @unique(map: "users_phone_unique") @db.VarChar(32)
+  passwordHash            String?                      @map("password_hash") @db.Text
+  role                    UserRole                     @default(PATIENT)
+  status                  UserStatus                   @default(ACTIVE)
+  createdAt               DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt             DateTime?                    @map("last_login_at") @db.Timestamptz(6)
+  emailVerifiedAt         DateTime?                    @map("email_verified_at") @db.Timestamptz(6)
+  phoneVerifiedAt         DateTime?                    @map("phone_verified_at") @db.Timestamptz(6)
+  notificationPreferences NotificationPreferences?
+  patientProfile          PatientProfile?
+  sessions                Session[]
+  auditLogs               AuditLog[]
+  inventory               MedicationInventory[]
+  prescriptions           Prescription[]               @relation("PatientPrescriptions")
+  authoredPrescriptions   Prescription[]               @relation("DoctorPrescriptions")
+  confirmedFields         PrescriptionExtractedField[]
+  prescriptionDocuments   PrescriptionDocument[]
+
+  @@map("users")
+}
+
+model PatientProfile {
+  userId            String       @id @map("user_id") @db.Uuid
+  firstName         String       @map("first_name") @db.VarChar(100)
+  lastName          String       @map("last_name") @db.VarChar(100)
+  dateOfBirth       DateTime?    @map("date_of_birth") @db.Date
+  preferredLanguage LanguageCode @default(EN) @map("preferred_language")
+  timezone          String       @default("UTC") @db.VarChar(64)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("patient_profiles")
+}
+
+model Session {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.Text
+  deviceMetadata   Json?     @map("device_metadata") @db.JsonB
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, revokedAt, expiresAt], map: "sessions_user_idx")
+  @@map("sessions")
+}
+
+model AuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  action       String   @db.VarChar(150)
+  resourceType String   @map("resource_type") @db.VarChar(100)
+  resourceId   String?  @map("resource_id") @db.Uuid
+  metadata     Json?    @db.JsonB
+  ipAddress    String?  @map("ip_address") @db.Inet
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor        User?    @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([actorId, createdAt], map: "audit_logs_actor_idx")
+  @@index([resourceType, resourceId], map: "audit_logs_resource_idx")
+  @@map("audit_logs")
+}
+
+enum MedicineStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+
+  @@map("medicine_status")
+}
+
+enum BarcodeType {
+  EAN13
+  EAN8
+  UPC
+  GTIN
+  QR
+  OTHER
+
+  @@map("barcode_type")
+}
+
+enum MedicineImageType {
+  FRONT
+  BACK
+  SIDE
+  PACKAGE
+  OTHER
+
+  @@map("medicine_image_type")
+}
+
+model Manufacturer {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String     @db.VarChar(255)
+  normalizedName String     @map("normalized_name") @db.VarChar(255)
+  country        String?    @db.VarChar(100)
+  website        String?    @db.VarChar(500)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  medicines      Medicine[]
+
+  @@index([normalizedName], map: "manufacturers_normalized_name_idx")
+  @@map("manufacturers")
+}
+
+model Medicine {
+  treatmentMedications TreatmentMedication[]
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String                @db.VarChar(255)
+  normalizedName       String                @map("normalized_name") @db.VarChar(255)
+  brandName            String?               @map("brand_name") @db.VarChar(255)
+  genericName          String?               @map("generic_name") @db.VarChar(255)
+  strength             String?               @db.VarChar(100)
+  dosageForm           String?               @map("dosage_form") @db.VarChar(100)
+  route                String?               @db.VarChar(100)
+  packageSize          String?               @map("package_size") @db.VarChar(100)
+  manufacturerId       String?               @map("manufacturer_id") @db.Uuid
+  registrationNumber   String?               @map("registration_number") @db.VarChar(150)
+  status               MedicineStatus        @default(ACTIVE)
+  country              String?               @db.VarChar(100)
+  description          String?               @db.Text
+  source               String?               @db.VarChar(150)
+  sourceVersion        String?               @map("source_version") @db.VarChar(100)
+  sourceUpdatedAt      DateTime?             @map("source_updated_at") @db.Timestamptz(6)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  manufacturer         Manufacturer?         @relation(fields: [manufacturerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ingredients          MedicineIngredient[]
+  barcodes             MedicineBarcode[]
+  images               MedicineImage[]
+  inventory            MedicationInventory[]
+
+  prescriptionMedications PrescriptionMedication[]
+
+  @@index([normalizedName], map: "medicines_normalized_name_idx")
+  @@index([genericName], map: "medicines_generic_name_idx")
+  @@index([status], map: "medicines_status_idx")
+  @@index([manufacturerId], map: "medicines_manufacturer_idx")
+  @@map("medicines")
+}
+
+model ActiveIngredient {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String               @db.VarChar(255)
+  normalizedName String               @unique(map: "active_ingredients_normalized_name_unique") @map("normalized_name") @db.VarChar(255)
+  description    String?              @db.Text
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  medicines      MedicineIngredient[]
+
+  @@map("active_ingredients")
+}
+
+model MedicineIngredient {
+  medicineId   String           @map("medicine_id") @db.Uuid
+  ingredientId String           @map("ingredient_id") @db.Uuid
+  amount       Decimal?         @db.Decimal(12, 4)
+  unit         String?          @db.VarChar(50)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  medicine     Medicine         @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ingredient   ActiveIngredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([medicineId, ingredientId])
+  @@index([ingredientId], map: "medicine_ingredients_ingredient_idx")
+  @@map("medicine_ingredients")
+}
+
+model MedicineBarcode {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medicineId  String      @map("medicine_id") @db.Uuid
+  barcode     String      @unique(map: "medicine_barcodes_barcode_unique") @db.VarChar(100)
+  barcodeType BarcodeType @map("barcode_type")
+  country     String?     @db.VarChar(10)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  medicine    Medicine    @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([medicineId], map: "medicine_barcodes_medicine_idx")
+  @@map("medicine_barcodes")
+}
+
+model MedicineImage {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medicineId String            @map("medicine_id") @db.Uuid
+  url        String            @db.Text
+  imageType  MedicineImageType @map("image_type")
+  sortOrder  Int               @default(0) @map("sort_order")
+  source     String?           @db.VarChar(150)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  medicine   Medicine          @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([medicineId, sortOrder], map: "medicine_images_order_idx")
+  @@map("medicine_images")
+}
+
+enum InventoryUnit {
+  TABLET
+  CAPSULE
+  ML
+  MG
+  G
+  DOSE
+  SACHET
+  AMPOULE
+  VIAL
+  SUPPOSITORY
+  DROP
+  PATCH
+  OTHER
+
+  @@map("inventory_unit")
+}
+
+enum InventorySource {
+  MANUAL
+  SCAN
+  PRESCRIPTION
+  IMPORT
+  OTHER
+
+  @@map("inventory_source")
+}
+
+model MedicationInventory {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String           @map("patient_id") @db.Uuid
+  medicineId        String           @map("medicine_id") @db.Uuid
+  quantity          Decimal          @db.Decimal(12, 3)
+  unit              InventoryUnit
+  batchNumber       String?          @map("batch_number") @db.VarChar(100)
+  expiryDate        DateTime?        @map("expiry_date") @db.Date
+  purchaseDate      DateTime?        @map("purchase_date") @db.Date
+  storageLocation   String?          @map("storage_location") @db.VarChar(150)
+  source            InventorySource?
+  archivedAt        DateTime?        @map("archived_at") @db.Timestamptz(6)
+  lowStockThreshold Decimal?         @map("low_stock_threshold") @db.Decimal(12, 3)
+  notes             String?          @db.Text
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  patient           User             @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  medicine          Medicine         @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([patientId], map: "inventory_patient_idx")
+  @@index([patientId, expiryDate], map: "inventory_patient_expiry_idx")
+  @@index([patientId, medicineId], map: "inventory_patient_medicine_idx")
+  @@index([medicineId], map: "inventory_medicine_idx")
+  @@map("medication_inventory")
+}
+
+enum PrescriptionSource {
+  SCANNED
+  MANUAL
+  SHARED
+  DIGITAL
+
+  @@map("prescription_source")
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  CONFIRMED
+  ARCHIVED
+
+  @@map("prescription_status")
+}
+
+enum OcrProcessingStatus {
+  UPLOADED
+  QUEUED
+  PROCESSING
+  REVIEW_REQUIRED
+  COMPLETED
+  FAILED
+
+  @@map("ocr_processing_status")
+}
+
+enum ExtractionSource {
+  OCR
+  AI
+  USER
+  PROFESSIONAL
+
+  @@map("extraction_source")
+}
+
+enum ExtractionConfirmationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+
+  @@map("extraction_confirmation_status")
+}
+
+model Prescription {
+  treatments       Treatment[]
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String                   @map("patient_id") @db.Uuid
+  doctorId         String?                  @map("doctor_id") @db.Uuid
+  prescriptionDate DateTime?                @map("prescription_date") @db.Date
+  validUntil       DateTime?                @map("valid_until") @db.Date
+  source           PrescriptionSource
+  processingStatus OcrProcessingStatus?     @map("processing_status")
+  status           PrescriptionStatus       @default(DRAFT)
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  patient          User                     @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  doctor           User?                    @relation("DoctorPrescriptions", fields: [doctorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  medications      PrescriptionMedication[]
+  documents        PrescriptionDocument[]
+
+  @@unique([id, patientId], map: "prescriptions_id_patient_unique")
+  @@index([patientId, status, createdAt], map: "prescriptions_patient_status_idx")
+  @@map("prescriptions")
+}
+
+model PrescriptionMedication {
+  id                 String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId     String                       @map("prescription_id") @db.Uuid
+  medicineId         String?                      @map("medicine_id") @db.Uuid
+  extractedName      String?                      @map("extracted_name") @db.VarChar(255)
+  dosage             Decimal?                     @db.Decimal(12, 4)
+  dosageUnit         String?                      @map("dosage_unit") @db.VarChar(50)
+  frequency          Decimal?                     @db.Decimal(12, 4)
+  frequencyUnit      String?                      @map("frequency_unit") @db.VarChar(50)
+  duration           Decimal?                     @db.Decimal(12, 4)
+  durationUnit       String?                      @map("duration_unit") @db.VarChar(50)
+  quantity           Decimal?                     @db.Decimal(12, 3)
+  instructions       String?                      @db.Text
+  confidence         Decimal?                     @db.Decimal(5, 4)
+  confirmationStatus ExtractionConfirmationStatus @default(PENDING) @map("confirmation_status")
+  createdAt          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  prescription       Prescription                 @relation(fields: [prescriptionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  medicine           Medicine?                    @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fields             PrescriptionExtractedField[]
+
+  @@index([prescriptionId], map: "prescription_medications_prescription_idx")
+  @@index([medicineId], map: "prescription_medications_medicine_idx")
+  @@map("prescription_medications")
+}
+
+model PrescriptionExtractedField {
+  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionMedicationId String                 @map("prescription_medication_id") @db.Uuid
+  fieldName                String                 @map("field_name") @db.Text
+  revision                 Int
+  value                    Json?                  @db.JsonB
+  confidence               Decimal?               @db.Decimal(5, 4)
+  source                   ExtractionSource
+  confirmed                Boolean
+  confirmedBy              String?                @map("confirmed_by") @db.Uuid
+  confirmedAt              DateTime?              @map("confirmed_at") @db.Timestamptz(6)
+  createdAt                DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  medication               PrescriptionMedication @relation(fields: [prescriptionMedicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  confirmer                User?                  @relation(fields: [confirmedBy], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([prescriptionMedicationId, fieldName, revision], map: "prescription_fields_revision_unique")
+  @@map("prescription_extracted_fields")
+}
+
+model PrescriptionDocument {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId   String              @map("prescription_id") @db.Uuid
+  patientId        String              @map("patient_id") @db.Uuid
+  pageNumber       Int                 @map("page_number")
+  storageKey       String              @unique(map: "prescription_documents_storage_key_unique") @map("storage_key") @db.Text
+  mimeType         String              @map("mime_type") @db.Text
+  processingStatus OcrProcessingStatus @map("processing_status")
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  retentionUntil   DateTime?           @map("retention_until") @db.Timestamptz(6)
+  deletedAt        DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  prescription     Prescription        @relation(fields: [prescriptionId, patientId], references: [id, patientId], onDelete: Restrict, onUpdate: Restrict)
+  patient          User                @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([prescriptionId, pageNumber], map: "prescription_documents_page_unique")
+  @@map("prescription_documents")
+}
+
+model NotificationPreferences {
+  userId               String   @id @map("user_id") @db.Uuid
+  doseReminders        Boolean  @map("dose_reminders")
+  expiryReminders      Boolean  @map("expiry_reminders")
+  lowStockAlerts       Boolean  @map("low_stock_alerts")
+  sharingNotifications Boolean  @map("sharing_notifications")
+  systemNotifications  Boolean  @map("system_notifications")
+  expiryLeadDays       Int?     @map("expiry_lead_days")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("notification_preferences")
+}
+
+enum TreatmentStatus {
+  PLANNED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+
+  @@map("treatment_status")
+}
+
+enum ScheduleType {
+  FIXED_TIMES
+
+  @@map("schedule_type")
+}
+
+enum MedicationEventStatus {
+  TAKEN
+  MISSED
+  SKIPPED
+
+  @@map("medication_event_status")
+}
+
+model Treatment {
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId      String                @map("patient_id") @db.Uuid
+  prescriptionId String?               @map("prescription_id") @db.Uuid
+  name           String                @db.VarChar(255)
+  startDate      DateTime              @map("start_date") @db.Date
+  endDate        DateTime              @map("end_date") @db.Date
+  status         TreatmentStatus       @default(PLANNED)
+  activatedAt    DateTime?             @map("activated_at") @db.Timestamptz(6)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  patient        User                  @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  prescription   Prescription?         @relation(fields: [prescriptionId, patientId], references: [id, patientId], onDelete: Restrict, onUpdate: Restrict)
+  medications    TreatmentMedication[]
+
+  @@index([patientId, createdAt])
+  @@map("treatments")
+}
+
+model TreatmentMedication {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  treatmentId  String               @map("treatment_id") @db.Uuid
+  medicineId   String               @map("medicine_id") @db.Uuid
+  dose         Decimal              @db.Decimal(12, 4)
+  doseUnit     String               @map("dose_unit") @db.VarChar(50)
+  scheduleType ScheduleType         @map("schedule_type")
+  instructions String?              @db.Text
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  treatment    Treatment            @relation(fields: [treatmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  medicine     Medicine             @relation(fields: [medicineId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  schedules    MedicationSchedule[]
+  events       MedicationEvent[]
+
+  @@unique([treatmentId, medicineId])
+  @@map("treatment_medications")
+}
+
+model MedicationSchedule {
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  treatmentMedicationId String                 @map("treatment_medication_id") @db.Uuid
+  time                  DateTime               @db.Time(0)
+  timezone              String                 @db.Text
+  daysOfWeek            Int[]                  @map("days_of_week") @db.SmallInt
+  startDate             DateTime               @map("start_date") @db.Date
+  endDate               DateTime               @map("end_date") @db.Date
+  enabled               Boolean                @default(true)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  medication            TreatmentMedication    @relation(fields: [treatmentMedicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  occurrences           MedicationOccurrence[]
+
+  @@index([treatmentMedicationId])
+  @@map("medication_schedules")
+}
+
+model MedicationOccurrence {
+  notification Notification?
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId    String             @map("patient_id") @db.Uuid
+  scheduleId   String             @map("schedule_id") @db.Uuid
+  localDate    DateTime           @map("local_date") @db.Date
+  timezone     String             @db.Text
+  scheduledAt  DateTime           @map("scheduled_at") @db.Timestamptz(6)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  patient      User               @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  schedule     MedicationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  event        MedicationEvent?
+
+  @@unique([id, patientId])
+  @@unique([scheduleId, localDate])
+  @@index([patientId, scheduledAt])
+  @@map("medication_occurrences")
+}
+
+model MedicationEvent {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurrenceId          String                @unique @map("occurrence_id") @db.Uuid
+  patientId             String                @map("patient_id") @db.Uuid
+  treatmentMedicationId String                @map("treatment_medication_id") @db.Uuid
+  scheduledAt           DateTime              @map("scheduled_at") @db.Timestamptz(6)
+  recordedAt            DateTime              @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  status                MedicationEventStatus
+  notes                 String?               @db.Text
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  occurrence            MedicationOccurrence  @relation(fields: [occurrenceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  patient               User                  @relation(fields: [patientId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  medication            TreatmentMedication   @relation(fields: [treatmentMedicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([patientId, scheduledAt])
+  @@map("medication_events")
+}
+
+enum NotificationType {
+  DOSE_DUE
+  DOSE_MISSED
+  EXPIRY
+  LOW_STOCK
+  PRESCRIPTION
+  SHARING
+  SYSTEM
+
+  @@map("notification_type")
+}
+
+model Notification {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  occurrenceId String               @unique @map("occurrence_id") @db.Uuid
+  type         NotificationType
+  title        String               @db.VarChar(255)
+  body         String               @db.Text
+  data         Json                 @db.JsonB
+  readAt       DateTime?            @map("read_at") @db.Timestamptz(6)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  occurrence   MedicationOccurrence @relation(fields: [occurrenceId, userId], references: [id, patientId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([occurrenceId, userId])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}

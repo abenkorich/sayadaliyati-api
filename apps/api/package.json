@@ -1,0 +1,38 @@
+{
+  "name": "@saydaliyati/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",
+    "test:integration": "node --test --test-concurrency=1 test/*.integration.mjs",
+    "openapi:generate": "node dist/openapi.js",
+    "storage:init": "node --env-file-if-exists=../../.env scripts/storage-init.mjs",
+    "worker:start": "node --env-file-if-exists=../../.env dist/reminders/main.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1140.0",
+    "@aws-sdk/s3-request-presigner": "3.1140.0",
+    "@js-temporal/polyfill": "0.5.1",
+    "@nestjs/common": "12.1.0",
+    "@nestjs/core": "12.1.0",
+    "@nestjs/platform-express": "12.1.0",
+    "@nestjs/swagger": "12.0.2",
+    "@saydaliyati/database": "workspace:*",
+    "@saydaliyati/validation": "workspace:*",
+    "argon2": "0.45.1",
+    "bullmq": "6.3.8",
+    "ioredis": "6.0.0",
+    "jose": "6.2.12",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "sharp": "0.35.4",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "12.1.0"
+  }
+}

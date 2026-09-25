@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+.expo/
+*.tsbuildinfo
+*.log
+.test-dist/
+packages/database/src/generated/
+.env
+.env.*
+!.env.example
+!.env.*.example
