@@ -159,10 +159,10 @@ model Medicine {
   normalizedName       String                @map("normalized_name") @db.VarChar(255)
   brandName            String?               @map("brand_name") @db.VarChar(255)
   genericName          String?               @map("generic_name") @db.VarChar(255)
-  strength             String?               @db.VarChar(100)
+  strength             String?               @db.Text
   dosageForm           String?               @map("dosage_form") @db.VarChar(100)
   route                String?               @db.VarChar(100)
-  packageSize          String?               @map("package_size") @db.VarChar(100)
+  packageSize          String?               @map("package_size") @db.Text
   manufacturerId       String?               @map("manufacturer_id") @db.Uuid
   registrationNumber   String?               @map("registration_number") @db.VarChar(150)
   status               MedicineStatus        @default(ACTIVE)
@@ -170,6 +170,11 @@ model Medicine {
   description          String?               @db.Text
   source               String?               @db.VarChar(150)
   sourceVersion        String?               @map("source_version") @db.VarChar(100)
+  regulatoryStatus     String?               @map("regulatory_status") @db.VarChar(30)
+  registrationHolder   String?               @map("registration_holder") @db.Text
+  holderCountry        String?               @map("holder_country") @db.Text
+  sourceChecksum       String?               @map("source_checksum") @db.VarChar(64)
+  sourceMetadata       Json?                 @map("source_metadata") @db.JsonB
   sourceUpdatedAt      DateTime?             @map("source_updated_at") @db.Timestamptz(6)
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -186,6 +191,19 @@ model Medicine {
   @@index([status], map: "medicines_status_idx")
   @@index([manufacturerId], map: "medicines_manufacturer_idx")
   @@map("medicines")
+}
+
+model MedicineImport {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source        String   @db.VarChar(150)
+  sourceVersion String   @map("source_version") @db.VarChar(100)
+  checksum      String   @db.VarChar(64)
+  sourceUrl     String   @map("source_url") @db.Text
+  snapshot      Json     @db.JsonB
+  report        Json     @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("medicine_imports")
 }
 
 model ActiveIngredient {

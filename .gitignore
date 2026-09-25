@@ -15,3 +15,7 @@ packages/database/src/generated/
 !.env.*.example
 
 /dev_data/
+
+import-artifacts/
+
+__pycache__/

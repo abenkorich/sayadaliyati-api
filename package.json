@@ -33,7 +33,8 @@
     "storage:init": "pnpm --filter @saydaliyati/api storage:init",
     "storage:stop": "docker compose --profile documents stop minio",
     "worker:start": "pnpm --filter @saydaliyati/api worker:start",
-    "start": "pnpm --filter @saydaliyati/api start"
+    "start": "pnpm --filter @saydaliyati/api start",
+    "db:import-miph": "node --env-file-if-exists=.env packages/database/scripts/import-miph.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
