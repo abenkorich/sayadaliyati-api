@@ -71,3 +71,11 @@ No remote, commit or push was created automatically.
 [Docker instructions](docs/DOCKER.md) cover image builds, API/worker processes,
 one-off migrations and a named or bind-mounted `/usr/src/app/dev_data` for retained
 imports, exports and configuration files.
+
+## Web portal
+
+The approved `saydaliyati-web` Next.js application is the browser version of the
+patient app. It ports all currently implemented mobile features and retains the
+mobile theme, using the separate `sayadaliyati-api` REST backend. See the
+[web portal blueprint](docs/WEB-PORTAL.md) for scope, session security, responsive
+UX and acceptance criteria. Implementation is assigned to a separate task.

@@ -151,3 +151,18 @@ authentication or inventory feature. See
 - [ ] Physical-device acceptance testing
 - [ ] Mobile treatment creation, inventory and prescription screens
 - [ ] Firebase/Expo provisioning, device registration and push delivery
+
+### Web portal milestone (D023)
+
+- [x] Approve Next.js portal scope, independent `saydaliyati-web` repo and mobile theme
+- [x] Bootstrap the independent web application and server API configuration
+- [x] Port all implemented mobile screens, session behavior and mutations
+- [x] Verify browser security, feature parity and responsive accessibility
+- [x] Complete production build, automated checks and browser smoke tests
+- [x] Include later Home dashboard, My Pharmacy filters and explicit manual stock entry
+- [ ] Live API browser acceptance after a real endpoint is configured
+- [ ] Safari/Firefox and physical-browser accessibility acceptance
+- [ ] Production Redis/HTTPS setup, domain/VPS deployment and shared-IP capacity review
+
+Web verification uses synthetic fixtures and isolated Redis; no real patient data
+or remote deployment. See the web repository's `docs/verification.md` for evidence.

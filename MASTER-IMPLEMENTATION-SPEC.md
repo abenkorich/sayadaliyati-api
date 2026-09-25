@@ -439,3 +439,11 @@ Foundation/tooling work precedes the first vertical slice, and tests/security
 accompany each slice. Slice labels are journey groupings, not authorization to
 implement everything at once. Prompt #3 is only a separately authorized minimal
 workspace bootstrap; no application implementation occurs during reconciliation.
+
+## Approved web channel
+
+The approved `saydaliyati-web` Next.js application is the browser version of the
+patient app. It ports all currently implemented mobile features and retains the
+mobile theme, using the separate `sayadaliyati-api` REST backend. See the
+[web portal blueprint](docs/WEB-PORTAL.md) for scope, session security, responsive
+UX and acceptance criteria. Implementation is assigned to a separate task.

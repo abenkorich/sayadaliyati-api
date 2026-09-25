@@ -187,3 +187,12 @@ automatic retry of dose mutations. The initial small client uses component state
 TanStack Query from D011 remains a later data-layer integration. Push registration
 and delivery remain blocked on the user-owned Expo/Firebase configuration and
 device verification; no provider credentials are invented.
+
+## D023 — Saydaliyati Portal, Next.js web app (2026-09-25)
+
+The user authorized a new task to implement the browser version of the current
+mobile app in the independent `saydaliyati-web` repository, with parallel agents
+where useful. [Web portal blueprint](docs/WEB-PORTAL.md) defines complete existing
+mobile-feature parity, mobile-aligned theming, responsive behavior, safe browser
+sessions and continued use of the existing API. This adds a patient web channel;
+it does not replace mobile, create an admin console or imply push delivery.

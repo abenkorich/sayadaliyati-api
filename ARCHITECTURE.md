@@ -186,3 +186,11 @@ ShareSession bootstraps AccessGrant. Only the recipient-bound AccessGrant and
 its permissions authorize subsequent shared reads; bootstrap expiry does not
 revoke grants. OCR jobs use their own processing state, separate from prescription
 business state. Multiple ordered prescription documents remain in private storage.
+
+## Current repositories and web portal
+
+The approved `saydaliyati-web` Next.js application is the browser version of the
+patient app. It ports all currently implemented mobile features and retains the
+mobile theme, using the separate `sayadaliyati-api` REST backend. See the
+[web portal blueprint](docs/WEB-PORTAL.md) for scope, session security, responsive
+UX and acceptance criteria. Implementation is assigned to a separate task.
