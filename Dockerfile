@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
-FROM node:24.21.0-bookworm-slim AS build
+FROM node:24.21.0-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install --global pnpm@11.24.0
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
+RUN npm install --global pnpm@11.24.0
 WORKDIR /usr/src/app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/package.json
@@ -23,9 +25,7 @@ RUN --mount=type=cache,id=sayadaliyati-pnpm,target=/usr/src/app/.pnpm-store \
 FROM build AS migrate
 CMD ["pnpm", "db:migrate"]
 
-FROM node:24.21.0-bookworm-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
-    && rm -rf /var/lib/apt/lists/*
+FROM base AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DEV_DATA_DIR=/usr/src/app/dev_data
 WORKDIR /usr/src/app
 COPY --from=build --chown=node:node /opt/api/ ./
