@@ -13,3 +13,5 @@ packages/database/src/generated/
 .env.*
 !.env.example
 !.env.*.example
+
+/dev_data/

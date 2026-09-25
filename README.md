@@ -40,7 +40,8 @@ and data were not moved. setup:local creates fresh ignored credentials; no actua
 ## VPS handoff
 
 You manage deployment, domain, TLS and secrets. Local docker-compose.yml runs
-development dependencies only; it is not a production deployment definition.
+development dependencies only. Use the separate Dockerfile and compose.api.yml
+for the API/worker image; see [Docker setup](docs/DOCKER.md).
 Provide DATABASE_URL (restricted runtime role), MIGRATION_DATABASE_URL (migration
 role), AUTH_SECRET, REDIS_URL, NODE_ENV=production, HOST and PORT to the processes.
 For attachments, provide the DOCUMENT_STORAGE_* settings documented in .env.example;
@@ -64,3 +65,9 @@ Root specifications and older milestone documents retain their original monorepo
 context; this README and the split notes are the current setup entry points.
 
 No remote, commit or push was created automatically.
+
+## API container and persistent files
+
+[Docker instructions](docs/DOCKER.md) cover image builds, API/worker processes,
+one-off migrations and a named or bind-mounted `/usr/src/app/dev_data` for retained
+imports, exports and configuration files.

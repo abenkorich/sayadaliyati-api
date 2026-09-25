@@ -34,5 +34,8 @@
   },
   "devDependencies": {
     "@nestjs/testing": "12.1.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

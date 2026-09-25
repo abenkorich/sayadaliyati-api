@@ -26,5 +26,8 @@
   "devDependencies": {
     "@types/pg": "8.23.1",
     "prisma": "7.10.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

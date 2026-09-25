@@ -3,3 +3,5 @@ dist/
 .test-dist/
 packages/database/src/generated/
 pnpm-lock.yaml
+
+dev_data/
