@@ -7,6 +7,7 @@
   "master_spec": "MASTER-IMPLEMENTATION-SPEC.md",
   "documentation": [
     "ADMIN-MEDICINE-DATA.md",
+    "AGENTS.md",
     "AI-ARCHITECTURE.md",
     "AI.md",
     "ALGERIAN-MEDICINE-IMPORT.md",
@@ -47,6 +48,7 @@
     "USER-JOURNEYS.md",
     "astra_audit.md",
     "design-assets/README.md",
+    "docs/ADMIN-DATA-TRANSFERS.md",
     "docs/ADMINISTRATION.md",
     "docs/ANDROID.md",
     "docs/API-DATABASE-FOUNDATION.md",
@@ -54,6 +56,7 @@
     "docs/BOOTSTRAP.md",
     "docs/CATALOG-DISCOVERY.md",
     "docs/DOCKER.md",
+    "docs/HEALTHCARE-DIRECTORIES.md",
     "docs/MEDICINE-CATALOG.md",
     "docs/MIPH-IMPORT.md",
     "docs/NOTIFICATION-PREFERENCES.md",

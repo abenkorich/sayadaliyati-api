@@ -36,6 +36,7 @@ enum LanguageCode {
 }
 
 model User {
+  adminTransferReceipts   AdminTransferReceipt[]
   notifications           Notification[]
   treatments              Treatment[]
   medicationOccurrences   MedicationOccurrence[]
@@ -645,4 +646,16 @@ model AdminSettings {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("admin_settings")
+}
+
+model AdminTransferReceipt {
+  id        String   @id @db.VarChar(64)
+  actorId   String   @map("actor_id") @db.Uuid
+  dataset   String   @db.VarChar(20)
+  count     Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([actorId, createdAt])
+  @@map("admin_transfer_receipts")
 }

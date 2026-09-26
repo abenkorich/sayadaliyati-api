@@ -34,4 +34,5 @@ GRANT SELECT, INSERT, UPDATE ON admin_directory_entries, admin_settings TO sayda
 GRANT UPDATE (status) ON users TO saydaliyati_app;
 GRANT INSERT (name, normalized_name, generic_name, strength, dosage_form, status, source, updated_at) ON medicines TO saydaliyati_app;
 GRANT UPDATE (name, normalized_name, generic_name, strength, dosage_form, status, source, updated_at) ON medicines TO saydaliyati_app;
+GRANT SELECT, INSERT ON admin_transfer_receipts TO saydaliyati_app;
 COMMIT;

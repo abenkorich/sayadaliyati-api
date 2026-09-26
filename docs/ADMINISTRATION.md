@@ -72,3 +72,7 @@ tests (27 passed, including real Redis) and production build pass. Four admin br
 directory saves, settings and subscription navigation, access-denied UI and horizontal
 overflow on desktop Chromium and Pixel 7 Chromium emulation. Screenshots contain only
 explicit synthetic fixture values. Physical devices and remote deployment remain untested.
+
+## JSON and CSV data transfers
+
+The admin workspace now includes [Import & Export](ADMIN-DATA-TRANSFERS.md) for all six currently managed datasets, with preview, validation, audited transactions and replay protection. See the linked guide for matching rules, limits and the additional receipt migration.

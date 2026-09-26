@@ -1,6 +1,278 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/admin/transfers/{dataset}/export": {
+      "get": {
+        "description": "Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Actual data exports are audited.",
+        "operationId": "AdminTransferController_export",
+        "parameters": [
+          {
+            "name": "dataset",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "users",
+                "medicines",
+                "doctors",
+                "pharmacies",
+                "hospitals",
+                "settings"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "template",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, file limits exceeded or export too large."
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "An active administrator is required."
+          },
+          "409": {
+            "description": "Preview expired or target data changed. No import changes committed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export managed admin fields or download an import template",
+        "tags": [
+          "Administration data transfers"
+        ]
+      }
+    },
+    "/api/v1/admin/transfers/{dataset}/preview": {
+      "post": {
+        "description": "Maximum 512 KiB UTF-8 and 500 rows (one for settings). Returns valid, issues, counts, first ten row summaries and a signed 15-minute token for a valid preview.",
+        "operationId": "AdminTransferController_preview",
+        "parameters": [
+          {
+            "name": "dataset",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "users",
+                "medicines",
+                "doctors",
+                "pharmacies",
+                "hospitals",
+                "settings"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "json",
+                      "csv"
+                    ]
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 524288
+                  },
+                  "token": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "format",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "Invalid request, file limits exceeded or export too large."
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "An active administrator is required."
+          },
+          "409": {
+            "description": "Preview expired or target data changed. No import changes committed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Validate JSON or CSV without changing records",
+        "tags": [
+          "Administration data transfers"
+        ]
+      }
+    },
+    "/api/v1/admin/transfers/{dataset}/apply": {
+      "post": {
+        "description": "Send the exact original format/content plus the preview token. Revalidates target state, audits changes and retains a receipt so repeated confirmations of the same token cannot create duplicate rows. Returns applied and alreadyApplied.",
+        "operationId": "AdminTransferController_apply",
+        "parameters": [
+          {
+            "name": "dataset",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "users",
+                "medicines",
+                "doctors",
+                "pharmacies",
+                "hospitals",
+                "settings"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "json",
+                      "csv"
+                    ]
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 524288
+                  },
+                  "token": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "format",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "Invalid request, file limits exceeded or export too large."
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "An active administrator is required."
+          },
+          "409": {
+            "description": "Preview expired or target data changed. No import changes committed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atomically apply a reviewed import",
+        "tags": [
+          "Administration data transfers"
+        ]
+      }
+    },
     "/api/v1/directory/{kind}": {
       "get": {
         "operationId": "DirectoryController_list",

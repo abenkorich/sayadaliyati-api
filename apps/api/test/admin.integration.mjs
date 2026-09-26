@@ -41,6 +41,9 @@ async function request(method = 'GET', body, token = tokens[0], path = '') {
   return { status: response.status, body: await response.json() };
 }
 async function cleanup() {
+  await owner.adminTransferReceipt.deleteMany({
+    where: { actorId: { in: users } },
+  });
   await owner.adminDirectoryEntry.deleteMany({
     where: { name: { startsWith: users[0] } },
   });
@@ -316,4 +319,434 @@ test('admin bootstrap hashes environment credentials, is idempotent and refuses 
       await owner.user.delete({ where: { id } });
     }
   }
+});
+
+test('transfers preview without writes, atomically apply and safely replay a confirmed batch', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const rows = [
+    {
+      name: users[0] + ' first',
+      specialty: null,
+      licenseNumber: null,
+      address: 'Line 1, "quoted"\nLine 2',
+      city: 'Algiers',
+      phone: '+213123456789',
+      email: null,
+      status: 'DRAFT',
+    },
+    {
+      name: users[0] + ' second',
+      specialty: null,
+      licenseNumber: null,
+      address: null,
+      city: 'Oran',
+      phone: null,
+      email: null,
+      status: 'ACTIVE',
+    },
+  ];
+  const payload = { format: 'json', content: JSON.stringify(rows) };
+  const preview = await request(
+    'POST',
+    payload,
+    tokens[0],
+    '/transfers/doctors/preview',
+  );
+  assert.equal(preview.status, 201, JSON.stringify(preview.body));
+  assert.equal(preview.body.data.valid, true);
+  assert.equal(preview.body.data.creates, 2);
+  assert.equal(
+    await owner.adminDirectoryEntry.count({
+      where: { name: { startsWith: users[0] } },
+    }),
+    0,
+  );
+  const confirmed = { ...payload, token: preview.body.data.token };
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { ...confirmed, token: confirmed.token + '.extra' },
+        tokens[0],
+        '/transfers/doctors/apply',
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { ...confirmed, content: payload.content + ' ' },
+        tokens[0],
+        '/transfers/doctors/apply',
+      )
+    ).status,
+    409,
+  );
+  const applied = await request(
+    'POST',
+    confirmed,
+    tokens[0],
+    '/transfers/doctors/apply',
+  );
+  assert.equal(applied.status, 201, JSON.stringify(applied.body));
+  assert.equal(applied.body.data.applied, 2);
+  const replay = await request(
+    'POST',
+    confirmed,
+    tokens[0],
+    '/transfers/doctors/apply',
+  );
+  assert.equal(replay.body.data.alreadyApplied, true);
+  assert.equal(
+    await owner.adminDirectoryEntry.count({
+      where: { name: { startsWith: users[0] } },
+    }),
+    2,
+  );
+  assert.equal(
+    await owner.adminTransferReceipt.count({ where: { actorId: users[0] } }),
+    1,
+  );
+  assert.equal(
+    await owner.auditLog.count({
+      where: { actorId: users[0], action: 'ADMIN_IMPORT_ROW' },
+    }),
+    2,
+  );
+  const exported = await request(
+    'GET',
+    undefined,
+    tokens[0],
+    `/transfers/doctors/export?format=csv&q=${users[0]}`,
+  );
+  assert.equal(exported.status, 200);
+  assert.equal(exported.body.data.count, 2);
+  assert.ok(exported.body.data.content.includes("'+213123456789"));
+  const roundTrip = await request(
+    'POST',
+    { format: 'csv', content: exported.body.data.content },
+    tokens[0],
+    '/transfers/doctors/preview',
+  );
+  assert.equal(roundTrip.body.data.valid, true, JSON.stringify(roundTrip.body));
+  assert.equal(roundTrip.body.data.unchanged, 2);
+});
+test('transfer failures leave all rows unchanged, reject cross-dataset IDs and stale previews', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const existing = await owner.medicine.create({
+    data: {
+      name: users[0] + ' original',
+      normalizedName: 'synthetic',
+      source: users[0],
+      status: 'INACTIVE',
+    },
+  });
+  const row = {
+    id: existing.id,
+    name: users[0] + ' changed',
+    genericName: null,
+    strength: null,
+    dosageForm: null,
+    status: 'INACTIVE',
+    source: users[0],
+  };
+  const invalid = await request(
+    'POST',
+    {
+      format: 'json',
+      content: JSON.stringify([row, { ...row, id: randomUUID(), source: '' }]),
+    },
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(invalid.body.data.valid, false);
+  assert.equal(
+    (await owner.medicine.findUnique({ where: { id: existing.id } })).name,
+    existing.name,
+  );
+  const payload = { format: 'json', content: JSON.stringify([row]) };
+  const preview = await request(
+    'POST',
+    payload,
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(preview.body.data.valid, true);
+  await owner.medicine.update({
+    where: { id: existing.id },
+    data: { strength: '1 mg' },
+  });
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { ...payload, token: preview.body.data.token },
+        tokens[0],
+        '/transfers/medicines/apply',
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await owner.medicine.findUnique({ where: { id: existing.id } })).name,
+    existing.name,
+  );
+  const refreshed = await request(
+    'POST',
+    payload,
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  const imported = await request(
+    'POST',
+    { ...payload, token: refreshed.body.data.token },
+    tokens[0],
+    '/transfers/medicines/apply',
+  );
+  assert.equal(imported.status, 201, JSON.stringify(imported.body));
+  assert.equal(imported.body.data.applied, 1);
+  const cross = await request(
+    'POST',
+    {
+      format: 'json',
+      content: JSON.stringify([
+        {
+          id: existing.id,
+          name: 'Unknown',
+          specialty: null,
+          licenseNumber: null,
+          address: null,
+          city: null,
+          phone: null,
+          email: null,
+          status: 'DRAFT',
+        },
+      ]),
+    },
+    tokens[0],
+    '/transfers/hospitals/preview',
+  );
+  assert.equal(cross.body.data.valid, false);
+});
+test('user imports preserve credentials and roles, protect administrators and revoke suspended sessions', async () => {
+  for (const path of [
+    '/transfers/users/export?format=json',
+    '/transfers/medicines/export?format=csv',
+  ])
+    assert.equal(
+      (await request('GET', undefined, tokens[0], path)).status,
+      403,
+    );
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { format: 'json', content: '[]' },
+        tokens[0],
+        '/transfers/users/preview',
+      )
+    ).status,
+    403,
+  );
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  for (const row of [
+    { id: users[0], status: 'SUSPENDED' },
+    { id: users[1], status: 'ACTIVE', role: 'ADMIN' },
+    { id: users[1], status: 'ACTIVE', password: 'secret' },
+  ]) {
+    const result = await request(
+      'POST',
+      { format: 'json', content: JSON.stringify([row]) },
+      tokens[0],
+      '/transfers/users/preview',
+    );
+    assert.equal(result.body.data.valid, false);
+  }
+  const payload = {
+    format: 'csv',
+    content: `id,status\r\n${users[1]},SUSPENDED\r\n`,
+  };
+  const preview = await request(
+    'POST',
+    payload,
+    tokens[0],
+    '/transfers/users/preview',
+  );
+  assert.equal(preview.body.data.valid, true);
+  const result = await request(
+    'POST',
+    { ...payload, token: preview.body.data.token },
+    tokens[0],
+    '/transfers/users/apply',
+  );
+  assert.equal(result.status, 201, JSON.stringify(result.body));
+  assert.ok(
+    (await owner.session.findUnique({ where: { id: sessions[1] } })).revokedAt,
+  );
+  const exported = await request(
+    'GET',
+    undefined,
+    tokens[0],
+    `/transfers/users/export?format=json&q=${users[1]}`,
+  );
+  assert.equal(exported.status, 200);
+  const rows = JSON.parse(exported.body.data.content);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, 'SUSPENDED');
+  assert.equal('passwordHash' in rows[0], false);
+  assert.equal('sessions' in rows[0], false);
+});
+test('large valid files pass the scoped parser while oversized imports and unknown datasets are rejected', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const row = {
+    name: users[0] + ' transfer',
+    genericName: null,
+    strength: null,
+    dosageForm: null,
+    status: 'INACTIVE',
+    source: users[0],
+  };
+  const rows = Array.from({ length: 150 }, (_, i) => ({
+    ...row,
+    name: row.name + i,
+  }));
+  const content = JSON.stringify(rows);
+  assert.ok(content.length > 16384);
+  const preview = await request(
+    'POST',
+    { format: 'json', content },
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(preview.status, 201, JSON.stringify(preview.body));
+  assert.equal(preview.body.data.valid, true);
+  const applied = await request(
+    'POST',
+    { format: 'json', content, token: preview.body.data.token },
+    tokens[0],
+    '/transfers/medicines/apply',
+  );
+  assert.equal(applied.status, 201, JSON.stringify(applied.body));
+  assert.equal(applied.body.data.applied, 150);
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { format: 'json', content: 'x'.repeat(512 * 1024 + 1) },
+        tokens[0],
+        '/transfers/medicines/preview',
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        'GET',
+        undefined,
+        tokens[0],
+        '/transfers/passwords/export?format=json',
+      )
+    ).status,
+    400,
+  );
+  const template = await request(
+    'GET',
+    undefined,
+    tokens[0],
+    '/transfers/medicines/export?format=json&template=true',
+  );
+  assert.equal(template.status, 200);
+  assert.equal(JSON.parse(template.body.data.content)[0].status, 'INACTIVE');
+});
+
+test('settings imports require one complete record and export the saved administrative values', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const previous = await owner.adminSettings.findUnique({
+    where: { id: 'platform' },
+  });
+  const row = {
+    organizationName: 'Synthetic transfer settings',
+    supportEmail: 'support@example.test',
+    defaultLanguage: 'FR',
+    timezone: 'Africa/Algiers',
+  };
+  try {
+    const payload = { format: 'json', content: JSON.stringify([row]) };
+    assert.equal(
+      (
+        await request(
+          'POST',
+          { ...payload, content: JSON.stringify([row, row]) },
+          tokens[0],
+          '/transfers/settings/preview',
+        )
+      ).body.data.valid,
+      false,
+    );
+    const preview = await request(
+      'POST',
+      payload,
+      tokens[0],
+      '/transfers/settings/preview',
+    );
+    assert.equal(preview.body.data.valid, true);
+    const apply = await request(
+      'POST',
+      { ...payload, token: preview.body.data.token },
+      tokens[0],
+      '/transfers/settings/apply',
+    );
+    assert.equal(apply.status, 201, JSON.stringify(apply.body));
+    const exported = await request(
+      'GET',
+      undefined,
+      tokens[0],
+      '/transfers/settings/export?format=json',
+    );
+    assert.deepEqual(JSON.parse(exported.body.data.content), [row]);
+  } finally {
+    if (previous)
+      await owner.adminSettings.update({
+        where: { id: 'platform' },
+        data: previous,
+      });
+    else await owner.adminSettings.deleteMany({ where: { id: 'platform' } });
+  }
+});
+test('concurrent confirmation cannot insert the same new rows twice', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const row = {
+    name: users[0] + ' concurrent',
+    genericName: null,
+    strength: null,
+    dosageForm: null,
+    status: 'INACTIVE',
+    source: users[0],
+  };
+  const payload = { format: 'json', content: JSON.stringify([row]) };
+  const preview = await request(
+    'POST',
+    payload,
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  const confirmed = { ...payload, token: preview.body.data.token };
+  const responses = await Promise.all([
+    request('POST', confirmed, tokens[0], '/transfers/medicines/apply'),
+    request('POST', confirmed, tokens[0], '/transfers/medicines/apply'),
+  ]);
+  assert.ok(responses.some((r) => r.status === 201));
+  assert.ok(
+    responses.every((r) => [201, 409].includes(r.status)),
+    JSON.stringify(responses),
+  );
+  assert.equal(
+    (await request('POST', confirmed, tokens[0], '/transfers/medicines/apply'))
+      .body.data.alreadyApplied,
+    true,
+  );
+  assert.equal(await owner.medicine.count({ where: { source: users[0] } }), 1);
 });

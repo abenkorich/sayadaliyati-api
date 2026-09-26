@@ -19,6 +19,7 @@ export async function isDatabaseReady(client: PrismaClient): Promise<boolean> {
     SELECT (
       to_regclass('public.admin_directory_entries') IS NOT NULL AND
       to_regclass('public.admin_settings') IS NOT NULL AND
+      to_regclass('public.admin_transfer_receipts') IS NOT NULL AND
       to_regclass('public.users') IS NOT NULL AND
       to_regclass('public.patient_profiles') IS NOT NULL AND
       to_regclass('public.sessions') IS NOT NULL AND

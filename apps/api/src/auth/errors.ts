@@ -1,4 +1,12 @@
 export const AUTH_ERRORS = {
+  ADMIN_TRANSFER_CONFLICT: [
+    409,
+    'Import preview expired or data changed. Preview the file again.',
+  ],
+  ADMIN_EXPORT_TOO_LARGE: [
+    400,
+    'Export exceeds 50,000 rows. Narrow your search filter.',
+  ],
   PRESCRIPTION_SCAN_NOT_CONFIGURED: [
     503,
     'Prescription extraction is not configured.',

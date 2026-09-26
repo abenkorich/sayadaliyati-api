@@ -23,6 +23,16 @@ export async function configureApplication(
       next();
     },
   );
+  (app as NestExpressApplication).useBodyParser('json', {
+    limit: '4mb',
+    type: (request: IncomingMessage) =>
+      Boolean(
+        request.url?.startsWith('/api/v1/admin/transfers/') &&
+        /^application\/json(?:;|$)/i.test(
+          request.headers['content-type'] ?? '',
+        ),
+      ),
+  });
   (app as NestExpressApplication).useBodyParser('json', { limit: '16kb' });
   app.useGlobalFilters(new HttpErrorFilter());
   app.enableShutdownHooks();

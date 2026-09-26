@@ -1,3 +1,5 @@
+import { AdminTransferController } from './admin/transfer.controller.js';
+import { AdminTransferService } from './admin/transfer.service.js';
 import { DirectoryController } from './directory/directory.controller.js';
 import { DirectoryService } from './directory/directory.service.js';
 import { AdminController } from './admin/admin.controller.js';
@@ -46,6 +48,7 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        AdminTransferController,
         DirectoryController,
         AdminController,
         PrescriptionScanController,
@@ -62,6 +65,7 @@ export class AppModule {
         PrescriptionsController,
       ],
       providers: [
+        AdminTransferService,
         DirectoryService,
         AdminService,
         PrescriptionScanService,
