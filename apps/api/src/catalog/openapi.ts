@@ -19,6 +19,9 @@ const summary = object({
     ...object({ id: uuid, slug: { type: 'string' }, name: { type: 'string' } }),
     nullable: true,
   },
+  registrationHolder: text,
+  holderCountry: text,
+  regulatoryStatus: { ...text, enum: ['CURRENT', 'NOT_RENEWED', 'WITHDRAWN'] },
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'] },
   manufacturer: {
     ...object({ id: uuid, name: { type: 'string' } }),
@@ -27,6 +30,31 @@ const summary = object({
 });
 const detail = object({
   ...summary.properties,
+  miph: {
+    ...object({
+      sourceUrl: { ...text, format: 'uri' },
+      sheet: text,
+      row: { type: 'integer', nullable: true },
+      checksum: text,
+      fields: {
+        type: 'array',
+        items: object({
+          name: { type: 'string' },
+          value: {
+            nullable: true,
+            oneOf: [
+              { type: 'string' },
+              { type: 'number' },
+              { type: 'boolean' },
+            ],
+          },
+          numberFormat: text,
+          displayValue: text,
+        }),
+      },
+    }),
+    nullable: true,
+  },
   route: text,
   packageSize: text,
   registrationNumber: text,

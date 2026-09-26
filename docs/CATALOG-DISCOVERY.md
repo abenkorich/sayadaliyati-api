@@ -55,3 +55,48 @@ Web browser regression tests cover placeholders, stale suggestions, keyboard
 selection, category filtering and prescription linking on desktop and phone sizes.
 Android bundling and TypeScript checks verify the native client. No package box
 images or medicine category assignments were fabricated.
+
+## Full MIPH directory data
+
+The existing import already stores every source column and Excel number format in
+`medicines.source_metadata`, plus sheet, row and source URL. Complete workbooks,
+including quarantined rows, remain in `medicine_imports.snapshot`. No reimport or
+schema migration is needed for the expanded directory. Quarantined rows are not
+silently promoted to canonical medicines.
+
+Medicine detail and barcode responses now include `miph`: source provenance and a
+`fields` array containing each original column's name, scalar value, number format
+and display value. Nulls and zero values are retained. Explicit Excel percentages
+are formatted for display without overwriting the original numeric value. All
+original fields, including unknown future columns, remain visible in the web and
+mobile detail views. MIPH codes, TYPE, STATUT, P1 and P2 remain source values; no
+unverified clinical meanings or category mappings are inferred.
+
+Authenticated `GET /api/v1/medicines/filters` lists registration holders, their
+countries and dosage forms. Catalog queries support exact `laboratory`,
+`holderCountry`, `dosageForm`, `barcode`, and `regulatoryStatus` filters. They
+intersect with category, manufacturer, ingredient and free-text search.
+`status=ALL` explicitly includes inactive/archived records; the default stays
+ACTIVE. Use `status=ALL&regulatoryStatus=WITHDRAWN` (or NOT_RENEWED) to browse
+historical registrations.
+
+Free text `q` now searches medicine names, ingredients, category names,
+manufacturer names, registration holders, holder countries, registration numbers,
+strength, form, route, packaging and selected original MIPH fields (CODE, LISTE,
+TYPE, STATUT, P1, P2, OBS, stability and withdrawal reason). Text searches are
+case-insensitive literal substrings. Stored barcode matching is exact and retains
+case and leading zeros. A MIPH nomenclature CODE is not a package barcode.
+The official workbook contains no package-barcode column or named therapeutic
+category column, so those require reviewed enrichment in the existing tables.
+
+Public suggestions accept the laboratory, holder-country and dosage-form filters
+alongside category, but remain limited to six ACTIVE records. Directory clients
+turn off suggestions while browsing historical/all records and use the full
+catalog search. Source metadata appears on detail responses only.
+
+Deploy the API before the web/mobile updates. Verification covers PostgreSQL
+search/filter intersections, literal LIKE metacharacters, exact barcode matching,
+all-field projections, desktop/phone browser navigation, and Android bundling.
+The older catalog integration assertion that the runtime role cannot update any
+medicine is incompatible with the current scoped admin UPDATE grant; it is an
+existing separate permission-test issue, not a change to privileges in this work.

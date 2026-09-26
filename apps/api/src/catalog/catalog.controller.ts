@@ -50,7 +50,7 @@ export class CatalogController {
     required: false,
     schema: { type: 'string', minLength: 1, maxLength: 200 },
     description:
-      'Literal substring in name, brand, generic name or ingredient; case-insensitive, accents preserved',
+      'Literal substring in medicine identity, category, laboratory, country, presentation and MIPH details; exact stored barcode match; case-insensitive text, accents preserved',
   })
   @ApiQuery({
     name: 'page',
@@ -69,6 +69,33 @@ export class CatalogController {
     description: 'Category UUID, or uncategorized',
   })
   @ApiQuery({
+    name: 'laboratory',
+    required: false,
+    schema: { type: 'string', maxLength: 255 },
+    description: 'Exact registration holder name',
+  })
+  @ApiQuery({
+    name: 'holderCountry',
+    required: false,
+    schema: { type: 'string', maxLength: 255 },
+  })
+  @ApiQuery({
+    name: 'dosageForm',
+    required: false,
+    schema: { type: 'string', maxLength: 255 },
+  })
+  @ApiQuery({
+    name: 'regulatoryStatus',
+    required: false,
+    enum: ['CURRENT', 'NOT_RENEWED', 'WITHDRAWN'],
+  })
+  @ApiQuery({
+    name: 'barcode',
+    required: false,
+    schema: { type: 'string', maxLength: 100 },
+    description: 'Exact stored barcode, including leading zeros',
+  })
+  @ApiQuery({
     name: 'ingredient',
     required: false,
     schema: { type: 'string', format: 'uuid' },
@@ -83,7 +110,7 @@ export class CatalogController {
     required: false,
     schema: {
       type: 'string',
-      enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'],
+      enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED', 'ALL'],
       default: 'ACTIVE',
     },
   })
@@ -105,6 +132,13 @@ export class CatalogController {
     schema: { type: 'string', minLength: 2, maxLength: 200 },
   })
   @ApiQuery({ name: 'category', required: false, schema: { type: 'string' } })
+  @ApiQuery({ name: 'laboratory', required: false, schema: { type: 'string' } })
+  @ApiQuery({
+    name: 'holderCountry',
+    required: false,
+    schema: { type: 'string' },
+  })
+  @ApiQuery({ name: 'dosageForm', required: false, schema: { type: 'string' } })
   @ApiResponse({ status: 200, schema: medicineListResponse })
   async suggestions(@Query() query: unknown, @Req() request: AuthRequest) {
     await this.rates.check(
@@ -114,7 +148,13 @@ export class CatalogController {
       60000,
     );
     const input = parse(
-      medicineQuerySchema.pick({ q: true, category: true }),
+      medicineQuerySchema.pick({
+        q: true,
+        category: true,
+        laboratory: true,
+        holderCountry: true,
+        dosageForm: true,
+      }),
       query,
     );
     if (!input.q || input.q.length < 2) throw new ApiError('VALIDATION_ERROR');
@@ -124,6 +164,33 @@ export class CatalogController {
       limit: 6,
       status: 'ACTIVE',
     });
+  }
+
+  @Get('filters')
+  @ApiOperation({
+    summary:
+      'List laboratory, holder-country and dosage-form filter values across the catalog',
+  })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: Object.fromEntries(
+            ['laboratories', 'countries', 'dosageForms'].map((key) => [
+              key,
+              { type: 'array', items: { type: 'string' } },
+            ]),
+          ),
+        },
+        meta: { type: 'object' },
+      },
+    },
+  })
+  filters() {
+    return this.catalog.filters();
   }
 
   @Get('categories')

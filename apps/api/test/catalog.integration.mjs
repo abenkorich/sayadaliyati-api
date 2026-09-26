@@ -24,6 +24,7 @@ const config = readConfig({
   REDIS_URL: process.env['TEST_REDIS_URL'],
 });
 const namespace = randomUUID();
+const categoryId = randomUUID();
 const manufacturerId = randomUUID(),
   ingredientId = randomUUID(),
   userId = randomUUID(),
@@ -38,6 +39,13 @@ async function get(path, access = token) {
   return { status: response.status, body: await response.json() };
 }
 before(async () => {
+  await owner.medicineCategory.create({
+    data: {
+      id: categoryId,
+      slug: `test-${namespace}`,
+      name: `Category ${namespace}`,
+    },
+  });
   await owner.manufacturer.create({
     data: {
       id: manufacturerId,
@@ -66,11 +74,20 @@ before(async () => {
         name: names[i],
         normalizedName: names[i].toLowerCase(),
         manufacturerId,
+        categoryId: i === 0 ? categoryId : null,
         status: i === 3 ? 'ARCHIVED' : i === 4 ? 'INACTIVE' : 'ACTIVE',
         brandName: i === 2 ? `علامة ${namespace}` : null,
         genericName: i === 1 ? `Generic ${namespace}` : null,
         source: 'SYNTHETIC_TEST_FIXTURE',
         sourceVersion: '1',
+        registrationHolder: i === 0 ? `Lab ${namespace}` : null,
+        holderCountry: i === 0 ? 'TEST COUNTRY' : null,
+        dosageForm: i === 0 ? 'TEST TABLET' : null,
+        regulatoryStatus: i === 4 ? 'WITHDRAWN' : 'CURRENT',
+        sourceMetadata:
+          i === 0
+            ? { raw: { CODE: `CODE ${namespace}`, OBS: 'Literal 10%_note' } }
+            : undefined,
         ingredients: {
           create: {
             ingredientId,
@@ -134,6 +151,7 @@ after(async () => {
       where: { medicineId: { in: ids } },
     });
     await owner.medicine.deleteMany({ where: { id: { in: ids } } });
+    await owner.medicineCategory.deleteMany({ where: { id: categoryId } });
     await owner.activeIngredient.deleteMany({ where: { id: ingredientId } });
     await owner.manufacturer.deleteMany({ where: { id: manufacturerId } });
     await owner.session.deleteMany({ where: { userId } });
@@ -190,7 +208,7 @@ test('search escapes SQL LIKE wildcards and treats SQL-shaped text as data', asy
       `?manufacturer=${manufacturerId}&q=${encodeURIComponent(q)}`,
     );
     assert.equal(result.status, 200);
-    assert.equal(result.body.meta.total, 0);
+    assert.equal(result.body.meta.total, ['%', '_'].includes(q) ? 1 : 0);
   }
 });
 test('ingredient and manufacturer filters intersect, and status is explicit', async () => {
@@ -317,6 +335,54 @@ test('catalog persistence rejects duplicate/unnormalized barcodes, bad reference
     owner.manufacturer.delete({ where: { id: manufacturerId } }),
   );
 });
+test('directory search includes laboratory, manufacturer, MIPH code and exact barcode; filters intersect', async () => {
+  for (const q of [
+    `Lab ${namespace}`,
+    `Category ${namespace}`,
+    `CODE ${namespace}`,
+    barcode,
+    '10%_note',
+  ]) {
+    const result = await get(
+      `?manufacturer=${manufacturerId}&q=${encodeURIComponent(q)}`,
+    );
+    assert.equal(result.status, 200);
+    assert.deepEqual(
+      result.body.data.map((m) => m.id),
+      [ids[0]],
+      q,
+    );
+  }
+  const combined = await get(
+    `?laboratory=${encodeURIComponent(`Lab ${namespace}`)}&holderCountry=TEST%20COUNTRY&dosageForm=TEST%20TABLET&barcode=${barcode}`,
+  );
+  assert.deepEqual(
+    combined.body.data.map((m) => m.id),
+    [ids[0]],
+  );
+  const none = await get(
+    `?manufacturer=${manufacturerId}&barcode=${barcode.toUpperCase()}`,
+  );
+  assert.equal(none.body.meta.total, 0);
+  const withdrawn = await get(
+    `?manufacturer=${manufacturerId}&status=ALL&regulatoryStatus=WITHDRAWN`,
+  );
+  assert.deepEqual(
+    withdrawn.body.data.map((m) => m.id),
+    [ids[4]],
+  );
+  const category = await get(
+    `?category=${categoryId}&q=${encodeURIComponent(`Lab ${namespace}`)}`,
+  );
+  assert.deepEqual(
+    category.body.data.map((m) => m.id),
+    [ids[0]],
+  );
+  const facets = await get('/filters');
+  assert.ok(facets.body.data.laboratories.includes(`Lab ${namespace}`));
+  assert.ok(facets.body.data.countries.includes('TEST COUNTRY'));
+});
+
 test('application database role reads catalog but cannot create, edit or delete master records', async () => {
   assert.equal(
     (await runtime.medicine.findUnique({ where: { id: ids[0] } })).id,

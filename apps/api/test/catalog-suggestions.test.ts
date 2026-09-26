@@ -60,11 +60,24 @@ test('public suggestions are bounded, validated and rate limited; full catalog s
     );
     assert.equal(response.status, 200);
     assert.deepEqual(input, {
-      q: 'alpha',
+      q: 'ALPHA',
       category: 'uncategorized',
       status: 'ACTIVE',
       page: 1,
       limit: 6,
+    });
+    const filtered = await fetch(
+      `${base}/api/v1/medicines/suggestions?q=00AbC&laboratory=Test%20Lab&holderCountry=ALGERIE&dosageForm=TABLET`,
+    );
+    assert.equal(filtered.status, 200);
+    assert.deepEqual(input, {
+      q: '00AbC',
+      laboratory: 'Test Lab',
+      holderCountry: 'ALGERIE',
+      dosageForm: 'TABLET',
+      page: 1,
+      limit: 6,
+      status: 'ACTIVE',
     });
     const data = (await response.json()) as {
       data: { boxImageUrl: string | null }[];
@@ -81,7 +94,7 @@ test('public suggestions are bounded, validated and rate limited; full catalog s
         (await fetch(`${base}/api/v1/medicines/suggestions${q}`)).status,
         400,
       );
-    for (const path of ['', '/categories'])
+    for (const path of ['', '/categories', '/filters'])
       assert.equal(
         (await fetch(`${base}/api/v1/medicines${path}`)).status,
         401,

@@ -13,6 +13,9 @@ const summary = {
   strength: true,
   dosageForm: true,
   status: true,
+  regulatoryStatus: true,
+  registrationHolder: true,
+  holderCountry: true,
   manufacturer: { select: { id: true, name: true } },
 } as const satisfies Prisma.MedicineSelect;
 const detail = {
@@ -27,6 +30,8 @@ const detail = {
   description: true,
   source: true,
   sourceVersion: true,
+  sourceMetadata: true,
+  sourceChecksum: true,
   sourceUpdatedAt: true,
   ingredients: {
     select: {
@@ -57,7 +62,16 @@ export class CatalogRepository {
       ? { contains: literal(query.q), mode: 'insensitive' as const }
       : undefined;
     const where: Prisma.MedicineWhereInput = {
-      status: query.status,
+      ...(query.status === 'ALL' ? {} : { status: query.status }),
+      ...(query.laboratory ? { registrationHolder: query.laboratory } : {}),
+      ...(query.holderCountry ? { holderCountry: query.holderCountry } : {}),
+      ...(query.dosageForm ? { dosageForm: query.dosageForm } : {}),
+      ...(query.regulatoryStatus
+        ? { regulatoryStatus: query.regulatoryStatus }
+        : {}),
+      ...(query.barcode
+        ? { barcodes: { some: { barcode: query.barcode } } }
+        : {}),
       ...(query.category
         ? {
             categoryId:
@@ -74,6 +88,33 @@ export class CatalogRepository {
               { normalizedName: contains },
               { brandName: contains },
               { genericName: contains },
+              { registrationHolder: contains },
+              { holderCountry: contains },
+              { registrationNumber: contains },
+              { strength: contains },
+              { dosageForm: contains },
+              { packageSize: contains },
+              { route: contains },
+              { category: { name: contains } },
+              { manufacturer: { name: contains } },
+              { barcodes: { some: { barcode: query.q! } } },
+              ...[
+                'CODE',
+                'LISTE',
+                'TYPE',
+                'STATUT',
+                'P1',
+                'P2',
+                'OBS',
+                'DUREE DE STABILITE',
+                'MOTIF DE RETRAIT',
+              ].map((field) => ({
+                sourceMetadata: {
+                  path: ['raw', field],
+                  string_contains: literal(query.q!),
+                  mode: 'insensitive' as const,
+                },
+              })),
               {
                 ingredients: {
                   some: { ingredient: { normalizedName: contains } },
@@ -104,6 +145,39 @@ export class CatalogRepository {
         total,
         totalPages: Math.ceil(total / query.limit),
       },
+    };
+  }
+  async filters() {
+    const [laboratories, countries, dosageForms] = await Promise.all([
+      this.db.client.medicine.findMany({
+        select: { registrationHolder: true },
+        distinct: ['registrationHolder'],
+        where: { registrationHolder: { not: null } },
+        orderBy: { registrationHolder: 'asc' },
+      }),
+      this.db.client.medicine.findMany({
+        select: { holderCountry: true },
+        distinct: ['holderCountry'],
+        where: { holderCountry: { not: null } },
+        orderBy: { holderCountry: 'asc' },
+      }),
+      this.db.client.medicine.findMany({
+        select: { dosageForm: true },
+        distinct: ['dosageForm'],
+        where: { dosageForm: { not: null } },
+        orderBy: { dosageForm: 'asc' },
+      }),
+    ]);
+    return {
+      laboratories: laboratories.flatMap((r) =>
+        r.registrationHolder ? [r.registrationHolder] : [],
+      ),
+      countries: countries.flatMap((r) =>
+        r.holderCountry ? [r.holderCountry] : [],
+      ),
+      dosageForms: dosageForms.flatMap((r) =>
+        r.dosageForm ? [r.dosageForm] : [],
+      ),
     };
   }
   categories() {

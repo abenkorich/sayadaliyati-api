@@ -7493,7 +7493,8 @@
               "enum": [
                 "ACTIVE",
                 "INACTIVE",
-                "ARCHIVED"
+                "ARCHIVED",
+                "ALL"
               ],
               "default": "ACTIVE"
             }
@@ -7515,6 +7516,57 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "barcode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Exact stored barcode, including leading zeros"
+          },
+          {
+            "name": "regulatoryStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CURRENT",
+                "NOT_RENEWED",
+                "WITHDRAWN"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "dosageForm",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          {
+            "name": "holderCountry",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          {
+            "name": "laboratory",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Exact registration holder name"
           },
           {
             "name": "category",
@@ -7556,7 +7608,7 @@
               "minLength": 1,
               "maxLength": 200
             },
-            "description": "Literal substring in name, brand, generic name or ingredient; case-insensitive, accents preserved"
+            "description": "Literal substring in medicine identity, category, laboratory, country, presentation and MIPH details; exact stored barcode match; case-insensitive text, accents preserved"
           }
         ],
         "responses": {
@@ -7586,6 +7638,9 @@
                           "dosageForm",
                           "boxImageUrl",
                           "category",
+                          "registrationHolder",
+                          "holderCountry",
+                          "regulatoryStatus",
                           "status",
                           "manufacturer"
                         ],
@@ -7639,6 +7694,23 @@
                               }
                             },
                             "nullable": true
+                          },
+                          "registrationHolder": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "holderCountry": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "regulatoryStatus": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "CURRENT",
+                              "NOT_RENEWED",
+                              "WITHDRAWN"
+                            ]
                           },
                           "status": {
                             "type": "string",
@@ -7930,6 +8002,30 @@
         "operationId": "CatalogController_suggestions",
         "parameters": [
           {
+            "name": "dosageForm",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "holderCountry",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "laboratory",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "required": false,
             "in": "query",
@@ -7975,6 +8071,9 @@
                           "dosageForm",
                           "boxImageUrl",
                           "category",
+                          "registrationHolder",
+                          "holderCountry",
+                          "regulatoryStatus",
                           "status",
                           "manufacturer"
                         ],
@@ -8028,6 +8127,23 @@
                               }
                             },
                             "nullable": true
+                          },
+                          "registrationHolder": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "holderCountry": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "regulatoryStatus": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "CURRENT",
+                              "NOT_RENEWED",
+                              "WITHDRAWN"
+                            ]
                           },
                           "status": {
                             "type": "string",
@@ -8305,6 +8421,271 @@
         },
         "security": [],
         "summary": "Public medicine name suggestions; active catalog only, maximum six results",
+        "tags": [
+          "Medicine catalog"
+        ]
+      }
+    },
+    "/api/v1/medicines/filters": {
+      "get": {
+        "operationId": "CatalogController_filters",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "laboratories": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "countries": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "dosageForms": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List laboratory, holder-country and dosage-form filter values across the catalog",
         "tags": [
           "Medicine catalog"
         ]
@@ -8610,14 +8991,15 @@
                         "dosageForm",
                         "boxImageUrl",
                         "category",
+                        "registrationHolder",
+                        "holderCountry",
+                        "regulatoryStatus",
                         "status",
                         "manufacturer",
+                        "miph",
                         "route",
                         "packageSize",
                         "registrationNumber",
-                        "regulatoryStatus",
-                        "registrationHolder",
-                        "holderCountry",
                         "country",
                         "description",
                         "source",
@@ -8678,6 +9060,23 @@
                           },
                           "nullable": true
                         },
+                        "registrationHolder": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "holderCountry": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "regulatoryStatus": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "CURRENT",
+                            "NOT_RENEWED",
+                            "WITHDRAWN"
+                          ]
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -8704,6 +9103,77 @@
                           },
                           "nullable": true
                         },
+                        "miph": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "sourceUrl",
+                            "sheet",
+                            "row",
+                            "checksum",
+                            "fields"
+                          ],
+                          "properties": {
+                            "sourceUrl": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "uri"
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "row": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "checksum": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "name",
+                                  "value",
+                                  "numberFormat",
+                                  "displayValue"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "nullable": true,
+                                    "oneOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      }
+                                    ]
+                                  },
+                                  "numberFormat": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "displayValue": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "nullable": true
+                        },
                         "route": {
                           "type": "string",
                           "nullable": true
@@ -8713,23 +9183,6 @@
                           "nullable": true
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "regulatoryStatus": {
-                          "type": "string",
-                          "nullable": true,
-                          "enum": [
-                            "CURRENT",
-                            "NOT_RENEWED",
-                            "WITHDRAWN"
-                          ]
-                        },
-                        "registrationHolder": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "holderCountry": {
                           "type": "string",
                           "nullable": true
                         },
@@ -9128,14 +9581,15 @@
                         "dosageForm",
                         "boxImageUrl",
                         "category",
+                        "registrationHolder",
+                        "holderCountry",
+                        "regulatoryStatus",
                         "status",
                         "manufacturer",
+                        "miph",
                         "route",
                         "packageSize",
                         "registrationNumber",
-                        "regulatoryStatus",
-                        "registrationHolder",
-                        "holderCountry",
                         "country",
                         "description",
                         "source",
@@ -9196,6 +9650,23 @@
                           },
                           "nullable": true
                         },
+                        "registrationHolder": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "holderCountry": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "regulatoryStatus": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "CURRENT",
+                            "NOT_RENEWED",
+                            "WITHDRAWN"
+                          ]
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -9222,6 +9693,77 @@
                           },
                           "nullable": true
                         },
+                        "miph": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "sourceUrl",
+                            "sheet",
+                            "row",
+                            "checksum",
+                            "fields"
+                          ],
+                          "properties": {
+                            "sourceUrl": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "uri"
+                            },
+                            "sheet": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "row": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "checksum": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "name",
+                                  "value",
+                                  "numberFormat",
+                                  "displayValue"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "nullable": true,
+                                    "oneOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      }
+                                    ]
+                                  },
+                                  "numberFormat": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "displayValue": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "nullable": true
+                        },
                         "route": {
                           "type": "string",
                           "nullable": true
@@ -9231,23 +9773,6 @@
                           "nullable": true
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "regulatoryStatus": {
-                          "type": "string",
-                          "nullable": true,
-                          "enum": [
-                            "CURRENT",
-                            "NOT_RENEWED",
-                            "WITHDRAWN"
-                          ]
-                        },
-                        "registrationHolder": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "holderCountry": {
                           "type": "string",
                           "nullable": true
                         },

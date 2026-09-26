@@ -12,12 +12,18 @@ const pageNumber = (maximum: number, fallback: string) =>
     .transform(Number)
     .pipe(z.number().int().min(1).max(maximum));
 export const medicineIdSchema = z.string().uuid();
+const filterText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine((value) => !value.includes('\u0000'));
 export const medicineQuerySchema = z
   .object({
     q: z
       .string()
       .max(200)
-      .transform(normalizeCatalogText)
+      .transform((value) => value.normalize('NFC').trim().replace(/\s+/gu, ' '))
       .pipe(
         z
           .string()
@@ -30,9 +36,22 @@ export const medicineQuerySchema = z
     category: z
       .union([medicineIdSchema, z.literal('uncategorized')])
       .optional(),
+    laboratory: filterText.optional(),
+    holderCountry: filterText.optional(),
+    dosageForm: filterText.optional(),
+    regulatoryStatus: z
+      .enum(['CURRENT', 'NOT_RENEWED', 'WITHDRAWN'])
+      .optional(),
+    barcode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(/^[\x21-\x7e]+$/)
+      .optional(),
     ingredient: medicineIdSchema.optional(),
     manufacturer: medicineIdSchema.optional(),
-    status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).default('ACTIVE'),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED', 'ALL']).default('ACTIVE'),
   })
   .strict();
 // Exact stored text, not a URL to fetch or a numeric value. Preserve leading zeros.
