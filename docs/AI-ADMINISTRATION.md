@@ -84,6 +84,6 @@ steps; this implementation was tested against the isolated local test database o
 
 Verified: API unit tests, isolated local PostgreSQL admin integration tests, web
 unit/session tests with real isolated Redis, four AI browser tests across Chromium
-desktop and Pixel 7, and API/web production builds. AI code passes lint and typecheck.
-Full web lint still reports the pre-existing `sessionVersion.current` render in
-`src/components/portal.tsx` and the registration test configuration warning.
+desktop and Pixel 7, and API/web production builds. API and web lint and typechecks pass. The portal now passes its session version
+through reactive state to directory components; request callbacks retain the current
+version ref. Registration test configuration also passes lint without warnings.
