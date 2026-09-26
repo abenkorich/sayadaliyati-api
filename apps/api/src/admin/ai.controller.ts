@@ -10,6 +10,8 @@ import {
   Req,
 } from '@nestjs/common';
 import {
+  ApiOperation,
+  ApiQuery,
   ApiBearerAuth,
   ApiBody,
   ApiTags,
@@ -40,11 +42,28 @@ export class AiController {
     return this.ai.save(actor(r), parsed.data, r.requestId);
   }
   @Post('verify')
+  @ApiOperation({
+    summary:
+      'Check credential and model access without inference; does not verify billing balance or extraction compatibility',
+  })
   @HttpCode(200)
   verify(@Req() r: AuthRequest) {
     return this.ai.verify(actor(r), r.requestId);
   }
-  @Get('usage') usage(@Req() r: AuthRequest, @Query() query: unknown) {
+  @Get('usage')
+  @ApiQuery({ name: 'days', required: false, enum: ['7', '30', '90'] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({
+    name: 'feature',
+    required: false,
+    enum: ['PRESCRIPTION', 'MEDICINE_BOX'],
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['STARTED', 'SUCCEEDED', 'FAILED'],
+  })
+  usage(@Req() r: AuthRequest, @Query() query: unknown) {
     const parsed = aiQuerySchema.safeParse(query);
     if (!parsed.success) throw new ApiError('VALIDATION_ERROR');
     return this.ai.dashboard(actor(r), parsed.data);

@@ -104,6 +104,7 @@
             "bearer": []
           }
         ],
+        "summary": "Check credential and model access without inference; does not verify billing balance or extraction compatibility",
         "tags": [
           "Administration AI"
         ]
@@ -112,7 +113,54 @@
     "/api/v1/admin/ai/usage": {
       "get": {
         "operationId": "AiController_usage",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "STARTED",
+                "SUCCEEDED",
+                "FAILED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "feature",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "PRESCRIPTION",
+                "MEDICINE_BOX"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "7",
+                "30",
+                "90"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""

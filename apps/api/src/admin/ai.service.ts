@@ -111,8 +111,8 @@ export class AiService {
             actorId: actor.userId,
             action,
             resourceType: 'AI_SETTINGS',
-            resourceId: '00000000-0000-0000-0000-000000000000',
-            requestId,
+            resourceId: null,
+            metadata: { requestId, result: 'SUCCESS' },
           },
         ],
       });

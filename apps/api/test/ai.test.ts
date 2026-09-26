@@ -127,3 +127,119 @@ test('scan metering captures only valid tokens including refused and incomplete 
   );
   assert.equal(meter.usage, undefined);
 });
+
+test('scan service meters successful and failed calls using effective admin configuration', async () => {
+  const { PrescriptionScanService } =
+    await import('../src/prescriptions/scan.service.js');
+  const { readConfig } = await import('../src/config.js');
+  const { default: sharp } = await import('sharp');
+  const settings = {
+    enabled: true,
+    model: 'override-model',
+    effectiveModel: 'override-model',
+    keyConfigured: true,
+    ...rates,
+    monthlyBudget: 50,
+  };
+  const events: unknown[][] = [];
+  const service = new PrescriptionScanService(
+    readConfig({
+      AUTH_SECRET: 'ab'.repeat(32),
+      REDIS_URL: 'redis://localhost/1',
+      DATABASE_URL: 'postgresql://localhost/test',
+      OPENAI_API_KEY: 'synthetic-secret',
+      PRESCRIPTION_SCAN_MODEL: 'env-model',
+    }),
+    {
+      check: async () => {},
+    } as unknown as import('../src/auth/rate-limit.service.js').RateLimitService,
+    {
+      client: { auditLog: { createMany: async () => ({ count: 1 }) } },
+    } as unknown as import('../src/database.service.js').DatabaseService,
+    {
+      configuration: async () => settings,
+      start: async (...args: unknown[]) => {
+        events.push(args);
+        return { id: 'request' };
+      },
+      finish: async (...args: unknown[]) => {
+        events.push(args);
+      },
+    } as unknown as import('../src/admin/ai.service.js').AiService,
+  );
+  const original = globalThis.fetch;
+  const file = {
+    buffer: await sharp({
+      create: { width: 8, height: 8, channels: 3, background: '#fff' },
+    })
+      .jpeg()
+      .toBuffer(),
+    mimetype: 'image/jpeg',
+  };
+  try {
+    globalThis.fetch = async (_url, init) => {
+      assert.equal(JSON.parse(String(init?.body)).model, 'override-model');
+      return new Response(
+        JSON.stringify({
+          status: 'completed',
+          usage: { input_tokens: 100, output_tokens: 20 },
+          output: [
+            {
+              type: 'message',
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    prescriptionDate: null,
+                    validUntil: null,
+                    medications: [],
+                    warnings: [],
+                  }),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    };
+    const result = await service.extract(
+      { userId: 'patient', sessionId: 'session', role: 'PATIENT' },
+      file,
+    );
+    assert.equal(result.data.requiresReview, true);
+    assert.equal(result.data.provider, 'OpenAI');
+    assert.deepEqual(events[0], ['PRESCRIPTION', 'override-model']);
+    assert.equal(events[1]?.[1], 'SUCCEEDED');
+    assert.deepEqual(events[1]?.[3], {
+      inputTokens: 100,
+      outputTokens: 20,
+      cachedInputTokens: 0,
+    });
+    globalThis.fetch = async () =>
+      new Response('private diagnostic', { status: 429 });
+    await assert.rejects(
+      service.extract(
+        { userId: 'patient', sessionId: 'session', role: 'PATIENT' },
+        file,
+        true,
+      ),
+      { code: 'PRESCRIPTION_SCAN_FAILED' },
+    );
+    assert.deepEqual(events[2], ['MEDICINE_BOX', 'override-model']);
+    assert.equal(events[3]?.[1], 'FAILED');
+    assert.equal(events[3]?.[5], 429);
+    settings.enabled = false;
+    await assert.rejects(
+      service.extract(
+        { userId: 'patient', sessionId: 'session', role: 'PATIENT' },
+        file,
+      ),
+      { code: 'PRESCRIPTION_SCAN_NOT_CONFIGURED' },
+    );
+    assert.equal(events.length, 4);
+    assert.ok(!JSON.stringify(events).includes('synthetic-secret'));
+    assert.ok(!JSON.stringify(events).includes('private diagnostic'));
+  } finally {
+    globalThis.fetch = original;
+  }
+});
