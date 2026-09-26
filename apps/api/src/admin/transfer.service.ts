@@ -405,7 +405,9 @@ export class AdminTransferService {
       >`INSERT INTO medicines (name, normalized_name, generic_name, strength, dosage_form, status, source) VALUES (${data.name}, ${normalizedName}, ${data.genericName}, ${data.strength}, ${data.dosageForm}, ${data.status}::medicine_status, ${data.source}) RETURNING id`;
       return created[0]!.id;
     }
-    const data = directorySchema.parse(fields);
+    const data = directorySchema
+      .omit({ countryId: true, wilayaId: true, communeId: true })
+      .parse(fields);
     if (id) {
       await tx.adminDirectoryEntry.update({
         where: { id },

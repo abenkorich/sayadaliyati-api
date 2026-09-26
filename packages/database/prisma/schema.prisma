@@ -66,6 +66,7 @@ model User {
 }
 
 model PatientProfile {
+  scanProcessingConsent Boolean? @map("scan_processing_consent")
   userId            String       @id @map("user_id") @db.Uuid
   firstName         String       @map("first_name") @db.VarChar(100)
   lastName          String       @map("last_name") @db.VarChar(100)
@@ -620,6 +621,12 @@ model Notification {
 }
 
 model AdminDirectoryEntry {
+  countryId     String?  @map("country_id") @db.Uuid
+  wilayaId      String?  @map("wilaya_id") @db.Uuid
+  communeId     String?  @map("commune_id") @db.Uuid
+  country       GeoZone? @relation("DirectoryCountry", fields: [countryId], references: [id], onDelete: Restrict)
+  wilaya        GeoZone? @relation("DirectoryWilaya", fields: [wilayaId], references: [id], onDelete: Restrict)
+  commune       GeoZone? @relation("DirectoryCommune", fields: [communeId], references: [id], onDelete: Restrict)
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kind          String   @db.VarChar(20)
   name          String   @db.VarChar(255)
@@ -633,6 +640,7 @@ model AdminDirectoryEntry {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@index([countryId, wilayaId, communeId])
   @@index([kind, name], map: "admin_directory_kind_name_idx")
   @@map("admin_directory_entries")
 }
@@ -658,4 +666,59 @@ model AdminTransferReceipt {
 
   @@index([actorId, createdAt])
   @@map("admin_transfer_receipts")
+}
+
+model GeoZone {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind          String                @db.VarChar(10)
+  code          String                @db.VarChar(32)
+  scope         String                @db.VarChar(36)
+  parentId      String?               @map("parent_id") @db.Uuid
+  parent        GeoZone?              @relation("GeoTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children      GeoZone[]             @relation("GeoTree")
+  nameEnglish   String                @map("name_english") @db.VarChar(150)
+  nameFrench    String?               @map("name_french") @db.VarChar(150)
+  nameArabic    String?               @map("name_arabic") @db.VarChar(150)
+  zone          String?               @db.VarChar(32)
+  isDeliverable Boolean?              @map("is_deliverable")
+  countries     AdminDirectoryEntry[] @relation("DirectoryCountry")
+  wilayas       AdminDirectoryEntry[] @relation("DirectoryWilaya")
+  communes      AdminDirectoryEntry[] @relation("DirectoryCommune")
+
+  @@unique([kind, scope, code])
+  @@index([parentId, nameEnglish])
+  @@map("geo_zones")
+}
+
+model AiSettings {
+  id String @id @db.VarChar(20)
+  enabled Boolean @default(true)
+  model String? @db.VarChar(120)
+  inputRate Float? @map("input_rate")
+  cachedInputRate Float? @map("cached_input_rate")
+  outputRate Float? @map("output_rate")
+  monthlyBudget Float? @map("monthly_budget")
+  checkedAt DateTime? @map("checked_at") @db.Timestamptz(6)
+  checkStatus String? @map("check_status") @db.VarChar(30)
+  checkFingerprint String? @map("check_fingerprint") @db.VarChar(64)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@map("ai_settings")
+}
+
+model AiRequest {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feature String @db.VarChar(30)
+  model String @db.VarChar(120)
+  status String @default("STARTED") @db.VarChar(20)
+  inputTokens Int? @map("input_tokens")
+  cachedInputTokens Int? @map("cached_input_tokens")
+  outputTokens Int? @map("output_tokens")
+  estimatedCostUsd Decimal? @map("estimated_cost_usd") @db.Decimal(20,8)
+  durationMs Int? @map("duration_ms")
+  errorCode String? @map("error_code") @db.VarChar(30)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  @@index([createdAt, id])
+  @@index([feature, status, createdAt])
+  @@map("ai_requests")
 }

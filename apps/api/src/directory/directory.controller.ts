@@ -23,6 +23,21 @@ export class DirectoryController {
     @Inject(DirectoryService) private readonly directory: DirectoryService,
   ) {}
   @Get(':kind')
+  @ApiQuery({
+    name: 'countryId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'wilayaId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'communeId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
   @ApiOperation({
     summary:
       'List active hospitals, pharmacies or doctors for authenticated portal users',

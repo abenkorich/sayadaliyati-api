@@ -1,3 +1,4 @@
+import { validateDirectoryLocation } from '../geography/geo.service.js';
 import { normalizeCatalogText } from '@saydaliyati/validation';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '@saydaliyati/database';
@@ -259,6 +260,17 @@ export class AdminService {
       id ? 'ADMIN_DIRECTORY_UPDATED' : 'ADMIN_DIRECTORY_CREATED',
       requestId,
       async (tx) => {
+        const previous = id
+          ? await tx.adminDirectoryEntry.findUnique({ where: { id } })
+          : null;
+        const { countryId, wilayaId, communeId, ...fields } = input;
+        const data = {
+          ...fields,
+          ...(countryId !== undefined ? { countryId } : {}),
+          ...(wilayaId !== undefined ? { wilayaId } : {}),
+          ...(communeId !== undefined ? { communeId } : {}),
+        };
+        await validateDirectoryLocation(tx, { ...previous, ...data });
         if (id) {
           if (
             !(await tx.adminDirectoryEntry.findFirst({
@@ -267,9 +279,9 @@ export class AdminService {
             }))
           )
             throw new ApiError('RESOURCE_NOT_FOUND');
-          return tx.adminDirectoryEntry.update({ where: { id }, data: input });
+          return tx.adminDirectoryEntry.update({ where: { id }, data });
         }
-        return tx.adminDirectoryEntry.create({ data: { ...input, kind } });
+        return tx.adminDirectoryEntry.create({ data: { ...data, kind } });
       },
       id,
     );

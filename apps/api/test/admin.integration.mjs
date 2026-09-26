@@ -47,6 +47,10 @@ async function cleanup() {
   await owner.adminDirectoryEntry.deleteMany({
     where: { name: { startsWith: users[0] } },
   });
+  for (const kind of ['communes', 'wilayas', 'countries'])
+    await owner.geoZone.deleteMany({
+      where: { kind, nameEnglish: { startsWith: users[0] } },
+    });
   await owner.medicine.deleteMany({ where: { source: users[0] } });
   await owner.notificationPreferences.deleteMany({
     where: { userId: { in: users } },
@@ -749,4 +753,283 @@ test('concurrent confirmation cannot insert the same new rows twice', async () =
     true,
   );
   assert.equal(await owner.medicine.count({ where: { source: users[0] } }), 1);
+});
+
+test('geography imports validate hierarchy, preserve source IDs and filter directory records', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const countryBody = { code: 'QZ', nameEnglish: users[0] + ' Test country' };
+  const country = await request(
+    'POST',
+    countryBody,
+    tokens[0],
+    '/geography/countries',
+  );
+  assert.equal(country.status, 201);
+  const countryId = country.body.data.id;
+  const input = {
+    countryId,
+    content: `wilayaId,name English,Arabic Name,French Name,zone,isDeliverable\n1,${users[0]} Wilaya,أدرار,Adrar,4,true`,
+  };
+  const denied = await request(
+    'POST',
+    input,
+    tokens[1],
+    '/geography/wilayas/apply',
+  );
+  assert.equal(denied.status, 403);
+  const preview = await request(
+    'POST',
+    input,
+    tokens[0],
+    '/geography/wilayas/preview',
+  );
+  assert.equal(preview.body.data.valid, true);
+  assert.equal(
+    await owner.geoZone.count({ where: { parentId: countryId } }),
+    0,
+  );
+  const applied = await request(
+    'POST',
+    input,
+    tokens[0],
+    '/geography/wilayas/apply',
+  );
+  assert.equal(applied.body.data.count, 1);
+  await request('POST', input, tokens[0], '/geography/wilayas/apply');
+  assert.equal(
+    await owner.geoZone.count({ where: { parentId: countryId } }),
+    1,
+  );
+  const wilaya = await owner.geoZone.findFirst({
+    where: { parentId: countryId },
+  });
+  const invalid = await request(
+    'POST',
+    {
+      countryId,
+      content: 'communeId,name,wilayaId\n101,Valid,1\n102,Invalid,999',
+    },
+    tokens[0],
+    '/geography/communes/apply',
+  );
+  assert.equal(invalid.body.data.valid, false);
+  assert.equal(
+    await owner.geoZone.count({ where: { parentId: wilaya.id } }),
+    0,
+  );
+  const communes = await request(
+    'POST',
+    {
+      countryId,
+      content:
+        'communeId,name,wilayaId\n' +
+        Array.from(
+          { length: 1541 },
+          (_, i) => `${i + 1},${users[0]} City ${i + 1},1`,
+        ).join('\n'),
+    },
+    tokens[0],
+    '/geography/communes/apply',
+  );
+  assert.equal(communes.body.data.count, 1541);
+  const commune = await owner.geoZone.findFirst({
+    where: { parentId: wilaya.id },
+  });
+  const entry = {
+    name: users[0] + ' Hospital',
+    specialty: null,
+    licenseNumber: null,
+    address: null,
+    city: 'Legacy city',
+    phone: null,
+    email: null,
+    status: 'ACTIVE',
+    countryId,
+    wilayaId: wilaya.id,
+    communeId: commune.id,
+  };
+  assert.equal(
+    (await request('POST', entry, tokens[0], '/directory/hospitals')).status,
+    201,
+  );
+  assert.equal(
+    (
+      await request(
+        'POST',
+        { ...entry, wilayaId: countryId },
+        tokens[0],
+        '/directory/hospitals',
+      )
+    ).status,
+    400,
+  );
+  const response = await fetch(
+    `${base}/api/v1/directory/hospitals?communeId=${commune.id}`,
+    { headers: { authorization: `Bearer ${tokens[1]}` } },
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).meta.total, 1);
+});
+
+test('AI administration requires ADMIN for settings, verification and usage', async () => {
+  for (const [method, path, body] of [
+    ['GET', '/ai/settings'],
+    ['GET', '/ai/usage'],
+    ['POST', '/ai/verify', {}],
+    [
+      'PATCH',
+      '/ai/settings',
+      {
+        enabled: false,
+        model: null,
+        inputRate: null,
+        cachedInputRate: null,
+        outputRate: null,
+        monthlyBudget: null,
+      },
+    ],
+  ]) {
+    assert.equal((await request(method, body, tokens[1], path)).status, 403);
+    assert.equal((await request(method, body, null, path)).status, 401);
+  }
+});
+test('AI settings persist, hide credentials, verify missing configuration and pause scans', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const previous = await owner.aiSettings.findUnique({
+    where: { id: 'platform' },
+  });
+  try {
+    const value = {
+      enabled: false,
+      model: null,
+      inputRate: 2,
+      cachedInputRate: 0.5,
+      outputRate: 8,
+      monthlyBudget: 50,
+    };
+    const saved = await request('PATCH', value, tokens[0], '/ai/settings');
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.data.enabled, false);
+    assert.equal(saved.body.data.monthlyBudget, 50);
+    assert.equal(saved.body.data.keyConfigured, false);
+    assert.equal(saved.body.data.checkFingerprint, undefined);
+    const verify = await request('POST', {}, tokens[0], '/ai/verify');
+    assert.equal(verify.status, 200);
+    assert.equal(verify.body.data.verification.status, 'NOT_CONFIGURED');
+    assert.ok(verify.body.data.verification.checkedAt);
+    assert.equal(
+      (
+        await request(
+          'PATCH',
+          { ...value, apiKey: 'should-not-save' },
+          tokens[0],
+          '/ai/settings',
+        )
+      ).status,
+      400,
+    );
+    const capability = await fetch(
+      `${base}/api/v1/me/prescription-scan/capabilities`,
+      { headers: { authorization: `Bearer ${tokens[1]}` } },
+    );
+    assert.equal((await capability.json()).data.enabled, false);
+    const audit = await owner.auditLog.count({
+      where: { actorId: users[0], action: 'AI_SETTINGS_UPDATED' },
+    });
+    assert.equal(audit, 1);
+  } finally {
+    await owner.aiSettings.deleteMany({ where: { id: 'platform' } });
+    if (previous) await owner.aiSettings.create({ data: previous });
+  }
+});
+test('AI runtime writes attempts and aggregates paginated history without medical data', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const model = `test-${users[0]}`;
+  const { AiService } = await import('../dist/admin/ai.service.js');
+  const service = app.get(AiService);
+  const previous = await owner.aiSettings.findUnique({
+    where: { id: 'platform' },
+  });
+  try {
+    await request(
+      'PATCH',
+      {
+        enabled: true,
+        model,
+        inputRate: 2,
+        cachedInputRate: 0.5,
+        outputRate: 8,
+        monthlyBudget: 50,
+      },
+      tokens[0],
+      '/ai/settings',
+    );
+    const first = await service.start('PRESCRIPTION', model);
+    await service.finish(
+      first.id,
+      'SUCCEEDED',
+      1250,
+      { inputTokens: 1000, cachedInputTokens: 200, outputTokens: 100 },
+      {
+        enabled: true,
+        model,
+        inputRate: 2,
+        cachedInputRate: 0.5,
+        outputRate: 8,
+        monthlyBudget: 50,
+      },
+    );
+    const failed = await service.start('MEDICINE_BOX', model);
+    await service.finish(
+      failed.id,
+      'FAILED',
+      200,
+      undefined,
+      {
+        enabled: true,
+        model,
+        inputRate: 2,
+        cachedInputRate: 0.5,
+        outputRate: 8,
+        monthlyBudget: 50,
+      },
+      429,
+    );
+    let report = await request(
+      'GET',
+      undefined,
+      tokens[0],
+      '/ai/usage?feature=PRESCRIPTION&status=SUCCEEDED&days=7',
+    );
+    assert.equal(report.status, 200);
+    const row = report.body.data.history.find((x) => x.id === first.id);
+    assert.equal(row.inputTokens, 1000);
+    assert.equal(row.estimatedCostUsd, 0.0025);
+    assert.equal(row.durationMs, 1250);
+    assert.equal(row.actorId, undefined);
+    assert.equal(row.image, undefined);
+    assert.equal(row.prompt, undefined);
+    assert.ok(report.body.data.daily.length);
+    assert.equal(report.body.data.credits.estimatedRemaining, null);
+    report = await request(
+      'GET',
+      undefined,
+      tokens[0],
+      '/ai/usage?feature=MEDICINE_BOX&status=FAILED',
+    );
+    assert.equal(
+      report.body.data.history.find((x) => x.id === failed.id).errorCode,
+      'RATE_LIMITED',
+    );
+    assert.equal(report.body.data.credits.providerBalance, null);
+    assert.equal(
+      (await request('GET', undefined, tokens[0], '/ai/usage?days=1000'))
+        .status,
+      400,
+    );
+  } finally {
+    await owner.aiRequest.deleteMany({ where: { model } });
+    await owner.aiSettings.deleteMany({ where: { id: 'platform' } });
+    if (previous) await owner.aiSettings.create({ data: previous });
+  }
 });

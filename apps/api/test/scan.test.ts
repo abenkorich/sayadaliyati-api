@@ -1,3 +1,4 @@
+import type { AiService } from '../src/admin/ai.service.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -194,8 +195,15 @@ test('unconfigured service and non-patient roles cannot invoke extraction', asyn
     config,
     {} as RateLimitService,
     {} as DatabaseService,
+    {
+      configuration: async () => ({
+        enabled: true,
+        keyConfigured: false,
+        effectiveModel: null,
+      }),
+    } as unknown as AiService,
   );
-  assert.deepEqual(service.capabilities(), {
+  assert.deepEqual(await service.capabilities(), {
     enabled: false,
     provider: 'OpenAI',
     requiresCroppedImage: true,

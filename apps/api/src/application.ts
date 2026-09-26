@@ -27,7 +27,8 @@ export async function configureApplication(
     limit: '4mb',
     type: (request: IncomingMessage) =>
       Boolean(
-        request.url?.startsWith('/api/v1/admin/transfers/') &&
+        (request.url?.startsWith('/api/v1/admin/transfers/') ||
+          request.url?.startsWith('/api/v1/admin/geography/')) &&
         /^application\/json(?:;|$)/i.test(
           request.headers['content-type'] ?? '',
         ),

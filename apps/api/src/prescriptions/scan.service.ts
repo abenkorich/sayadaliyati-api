@@ -1,3 +1,4 @@
+import { AiService, type Usage } from '../admin/ai.service.js';
 import { Inject, Injectable } from '@nestjs/common';
 import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
@@ -30,11 +31,15 @@ export class PrescriptionScanService {
     @Inject(API_CONFIG) private readonly config: ApiConfig,
     @Inject(RateLimitService) private readonly rate: RateLimitService,
     @Inject(DatabaseService) private readonly db: DatabaseService,
+    @Inject(AiService) private readonly ai: AiService,
   ) {}
-  capabilities() {
+  async capabilities() {
+    const settings = await this.ai.configuration();
     return {
       enabled: !!(
-        this.config.OPENAI_API_KEY && this.config.PRESCRIPTION_SCAN_MODEL
+        settings.enabled &&
+        settings.keyConfigured &&
+        settings.effectiveModel
       ),
       provider: 'OpenAI' as const,
       requiresCroppedImage: true,
@@ -46,7 +51,12 @@ export class PrescriptionScanService {
     box = false,
   ) {
     if (context.role !== 'PATIENT') throw new ApiError('FORBIDDEN');
-    if (!this.capabilities().enabled)
+    const settings = await this.ai.configuration();
+    if (!(
+      settings.enabled &&
+      settings.keyConfigured &&
+      settings.effectiveModel
+    ))
       throw new ApiError('PRESCRIPTION_SCAN_NOT_CONFIGURED');
     await this.rate.check('prescription-scan-minute', context.userId, 2, 60000);
     await this.rate.check(
@@ -73,12 +83,39 @@ export class PrescriptionScanService {
         },
       ],
     });
-    const preview = await extractWithOpenAI(
-      this.config.OPENAI_API_KEY!,
-      this.config.PRESCRIPTION_SCAN_MODEL!,
-      image,
-      fetch,
-      box,
+    const attempt = await this.ai.start(
+      box ? 'MEDICINE_BOX' : 'PRESCRIPTION',
+      settings.effectiveModel!,
+    );
+    const started = performance.now();
+    const telemetry: { usage?: Usage; httpStatus?: number } = {};
+    let preview;
+    try {
+      preview = await extractWithOpenAI(
+        this.config.OPENAI_API_KEY!,
+        settings.effectiveModel!,
+        image,
+        fetch,
+        box,
+        telemetry,
+      );
+    } catch (error) {
+      await this.ai.finish(
+        attempt.id,
+        'FAILED',
+        performance.now() - started,
+        telemetry.usage,
+        settings,
+        telemetry.httpStatus,
+      );
+      throw error;
+    }
+    await this.ai.finish(
+      attempt.id,
+      'SUCCEEDED',
+      performance.now() - started,
+      telemetry.usage,
+      settings,
     );
     return {
       data: { ...preview, provider: 'OpenAI', requiresReview: true },

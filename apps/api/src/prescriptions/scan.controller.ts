@@ -40,9 +40,9 @@ export class PrescriptionScanController {
   @ApiOperation({
     summary: 'Whether AI extraction is configured; exposes no credentials',
   })
-  capabilities(@Req() request: AuthRequest) {
+  async capabilities(@Req() request: AuthRequest) {
     if (actor(request).role !== 'PATIENT') throw new ApiError('FORBIDDEN');
-    return { data: this.scan.capabilities(), meta: {} };
+    return { data: await this.scan.capabilities(), meta: {} };
   }
   @Post(['', 'box'])
   @HttpCode(200)

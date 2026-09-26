@@ -6,6 +6,9 @@ import { DatabaseService } from '../database.service.js';
 export const directoryKind = z.enum(['hospitals', 'pharmacies', 'doctors']);
 export const directoryQuery = z
   .object({
+    countryId: z.string().uuid().optional(),
+    wilayaId: z.string().uuid().optional(),
+    communeId: z.string().uuid().optional(),
     q: z.string().trim().max(100).default(''),
     city: z.string().trim().max(100).default(''),
     page: z.coerce.number().int().min(1).max(10000).default(1),
@@ -13,6 +16,13 @@ export const directoryQuery = z
   })
   .strict();
 export const directorySelect = {
+  country: {
+    select: { nameEnglish: true, nameFrench: true, nameArabic: true },
+  },
+  wilaya: { select: { nameEnglish: true, nameFrench: true, nameArabic: true } },
+  commune: {
+    select: { nameEnglish: true, nameFrench: true, nameArabic: true },
+  },
   id: true,
   kind: true,
   name: true,
@@ -34,6 +44,9 @@ export class DirectoryService {
     const where: Prisma.AdminDirectoryEntryWhereInput = {
       kind,
       status: 'ACTIVE',
+      ...(query.countryId ? { countryId: query.countryId } : {}),
+      ...(query.wilayaId ? { wilayaId: query.wilayaId } : {}),
+      ...(query.communeId ? { communeId: query.communeId } : {}),
       ...(city
         ? { city: { contains: literal(city), mode: 'insensitive' as const } }
         : {}),

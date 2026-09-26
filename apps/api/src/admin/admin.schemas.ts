@@ -27,6 +27,9 @@ export const directoryKindSchema = z.enum([
 ]);
 export const directorySchema = z
   .object({
+    countryId: z.string().uuid().nullable().optional(),
+    wilayaId: z.string().uuid().nullable().optional(),
+    communeId: z.string().uuid().nullable().optional(),
     name: z.string().trim().min(1).max(255),
     specialty: optionalText(150),
     licenseNumber: optionalText(150),

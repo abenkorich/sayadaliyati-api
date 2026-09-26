@@ -17,9 +17,12 @@ export function createDatabaseClient(connectionString: string): PrismaClient {
 export async function isDatabaseReady(client: PrismaClient): Promise<boolean> {
   const rows = await client.$queryRaw<Array<{ ready: boolean }>>`
     SELECT (
+      to_regclass('public.geo_zones') IS NOT NULL AND
       to_regclass('public.admin_directory_entries') IS NOT NULL AND
       to_regclass('public.admin_settings') IS NOT NULL AND
       to_regclass('public.admin_transfer_receipts') IS NOT NULL AND
+      to_regclass('public.ai_settings') IS NOT NULL AND
+      to_regclass('public.ai_requests') IS NOT NULL AND
       to_regclass('public.users') IS NOT NULL AND
       to_regclass('public.patient_profiles') IS NOT NULL AND
       to_regclass('public.sessions') IS NOT NULL AND

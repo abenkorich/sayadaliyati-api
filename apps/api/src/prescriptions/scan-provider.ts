@@ -1,3 +1,4 @@
+import type { Usage } from '../admin/ai.service.js';
 import { z } from 'zod';
 import { ApiError } from '../auth/errors.js';
 import {
@@ -13,6 +14,7 @@ export async function extractWithOpenAI(
   image: Buffer,
   transport: typeof fetch = fetch,
   box = false,
+  telemetry?: { usage?: Usage; httpStatus?: number },
 ) {
   try {
     const response = await transport('https://api.openai.com/v1/responses', {
@@ -54,6 +56,7 @@ export async function extractWithOpenAI(
         },
       }),
     });
+    if (telemetry) telemetry.httpStatus = response.status;
     if (!response.ok || !response.body) throw new Error('Provider unavailable');
     const reader = response.body.getReader();
     let size = 0;
@@ -71,6 +74,26 @@ export async function extractWithOpenAI(
     const envelope: unknown = JSON.parse(
       Buffer.concat(chunks).toString('utf8'),
     );
+    const meter = z
+      .object({
+        usage: z.object({
+          input_tokens: z.number().int().min(0).max(2147483647),
+          output_tokens: z.number().int().min(0).max(2147483647),
+          input_tokens_details: z
+            .object({ cached_tokens: z.number().int().min(0).max(2147483647) })
+            .optional(),
+        }),
+      })
+      .safeParse(envelope);
+    if (telemetry && meter.success) {
+      const u = meter.data.usage;
+      if ((u.input_tokens_details?.cached_tokens ?? 0) <= u.input_tokens)
+        telemetry.usage = {
+          inputTokens: u.input_tokens,
+          outputTokens: u.output_tokens,
+          cachedInputTokens: u.input_tokens_details?.cached_tokens ?? 0,
+        };
+    }
     const parsed = z
       .object({
         status: z.literal('completed'),

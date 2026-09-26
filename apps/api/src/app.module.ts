@@ -1,9 +1,14 @@
+import { AiController } from './admin/ai.controller.js';
+import { AiService } from './admin/ai.service.js';
+import { GeoController } from './geography/geo.controller.js';
+import { GeoService } from './geography/geo.service.js';
 import { AdminTransferController } from './admin/transfer.controller.js';
 import { AdminTransferService } from './admin/transfer.service.js';
 import { DirectoryController } from './directory/directory.controller.js';
 import { DirectoryService } from './directory/directory.service.js';
 import { AdminController } from './admin/admin.controller.js';
 import { AdminService } from './admin/admin.service.js';
+import { ScanPreferencesController } from './prescriptions/scan-preferences.controller.js';
 import { PrescriptionScanController } from './prescriptions/scan.controller.js';
 import { PrescriptionScanService } from './prescriptions/scan.service.js';
 import { NotificationInboxController } from './notifications/inbox.controller.js';
@@ -48,10 +53,13 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        AiController,
+        GeoController,
         AdminTransferController,
         DirectoryController,
         AdminController,
         PrescriptionScanController,
+        ScanPreferencesController,
         DocumentsController,
         NotificationPreferencesController,
         TreatmentsController,
@@ -65,6 +73,8 @@ export class AppModule {
         PrescriptionsController,
       ],
       providers: [
+        AiService,
+        GeoService,
         AdminTransferService,
         DirectoryService,
         AdminService,

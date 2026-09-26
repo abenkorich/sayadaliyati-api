@@ -1,6 +1,446 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/admin/ai/settings": {
+      "get": {
+        "operationId": "AiController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration AI"
+        ]
+      },
+      "patch": {
+        "operationId": "AiController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "model": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9._:-]{1,120}$"
+                  },
+                  "inputRate": {
+                    "nullable": true,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "cachedInputRate": {
+                    "nullable": true,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "outputRate": {
+                    "nullable": true,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "monthlyBudget": {
+                    "nullable": true,
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "model",
+                  "inputRate",
+                  "cachedInputRate",
+                  "outputRate",
+                  "monthlyBudget"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration AI"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/verify": {
+      "post": {
+        "operationId": "AiController_verify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration AI"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/usage": {
+      "get": {
+        "operationId": "AiController_usage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration AI"
+        ]
+      }
+    },
+    "/api/v1/geography/{kind}": {
+      "get": {
+        "operationId": "GeoController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "countries",
+                "wilayas",
+                "communes"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Geography"
+        ]
+      }
+    },
+    "/api/v1/admin/geography/{kind}": {
+      "post": {
+        "operationId": "GeoController_create",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "countries",
+                "wilayas",
+                "communes"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32,
+                    "pattern": "^[A-Za-z0-9-]+$"
+                  },
+                  "parentId": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "nameEnglish": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "nameFrench": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 150
+                  },
+                  "nameArabic": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 150
+                  },
+                  "zone": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "isDeliverable": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "parentId",
+                  "nameEnglish",
+                  "nameFrench",
+                  "nameArabic",
+                  "zone",
+                  "isDeliverable"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Geography"
+        ]
+      }
+    },
+    "/api/v1/admin/geography/{kind}/{id}": {
+      "patch": {
+        "operationId": "GeoController_save",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "countries",
+                "wilayas",
+                "communes"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32,
+                    "pattern": "^[A-Za-z0-9-]+$"
+                  },
+                  "parentId": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "nameEnglish": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "nameFrench": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 150
+                  },
+                  "nameArabic": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 150
+                  },
+                  "zone": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "isDeliverable": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "parentId",
+                  "nameEnglish",
+                  "nameFrench",
+                  "nameArabic",
+                  "zone",
+                  "isDeliverable"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Geography"
+        ]
+      }
+    },
+    "/api/v1/admin/geography/{kind}/{operation}": {
+      "post": {
+        "operationId": "GeoController_import",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "countries",
+                "wilayas",
+                "communes"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "preview",
+                "apply"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2097152
+                  },
+                  "countryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Geography"
+        ]
+      }
+    },
     "/api/v1/admin/transfers/{dataset}/export": {
       "get": {
         "description": "Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Actual data exports are audited.",
@@ -330,6 +770,33 @@
               "maxLength": 100
             },
             "description": "Literal case-insensitive search in name, specialty, address and city"
+          },
+          {
+            "name": "communeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wilayaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "countryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -850,6 +1317,24 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "countryId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "wilayaId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "communeId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "name": {
                     "type": "string",
                     "minLength": 1,
@@ -964,6 +1449,24 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "countryId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "wilayaId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "communeId": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
                   "name": {
                     "type": "string",
                     "minLength": 1,
@@ -1676,6 +2179,63 @@
         "summary": "Extract an unconfirmed preview from one image; creates no prescription, document or treatment",
         "tags": [
           "Prescription extraction preview"
+        ]
+      }
+    },
+    "/api/v1/me/scan-preferences": {
+      "get": {
+        "operationId": "ScanPreferencesController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read own saved scan processing permission",
+        "tags": [
+          "Scan preferences"
+        ]
+      },
+      "patch": {
+        "operationId": "ScanPreferencesController_patch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "processingConsent"
+                ],
+                "properties": {
+                  "processingConsent": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save or revoke own scan processing permission",
+        "tags": [
+          "Scan preferences"
         ]
       }
     },

@@ -103,13 +103,22 @@ const schemas = {
       path: ['source'],
       message: 'A source is required for a new medicine.',
     }),
-  doctors: directorySchema.extend({ id }),
-  pharmacies: directorySchema.extend({ id }),
-  hospitals: directorySchema.extend({ id }),
+  doctors: directorySchema
+    .omit({ countryId: true, wilayaId: true, communeId: true })
+    .extend({ id }),
+  pharmacies: directorySchema
+    .omit({ countryId: true, wilayaId: true, communeId: true })
+    .extend({ id }),
+  hospitals: directorySchema
+    .omit({ countryId: true, wilayaId: true, communeId: true })
+    .extend({ id }),
   settings: settingsSchema,
 };
 // RFC 4180-style records: quoted commas, CRLF and multiline fields; reject malformed quotes.
-export function parseCsv(content: string): string[][] {
+export function parseCsv(
+  content: string,
+  maxRows = MAX_IMPORT_ROWS,
+): string[][] {
   const records: string[][] = [];
   let row: string[] = [],
     field = '',
@@ -125,8 +134,8 @@ export function parseCsv(content: string): string[][] {
     pushField();
     records.push(row);
     row = [];
-    if (records.length > MAX_IMPORT_ROWS + 1)
-      throw new Error(`Use at most ${MAX_IMPORT_ROWS} rows per import.`);
+    if (records.length > maxRows + 1)
+      throw new Error(`Use at most ${maxRows} rows per import.`);
   };
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!;
