@@ -15,8 +15,9 @@ Browser JavaScript never receives access tokens, refresh tokens or bootstrap cre
   must come from the administrator; this does not confer clinical verification.
 - Doctors, pharmacies, hospitals: create/edit contact directory records, search by name
   or city, draft/active/archive lifecycle. These are directory entries, not professional
-  accounts or credential-verification records. Public directory publication and account
-  linkage remain separate future features.
+  accounts or credential-verification records. Active entries are available to signed-in portal users in the healthcare
+  directory. Draft and archived entries are hidden. Unauthenticated publication
+  and professional-account linkage remain separate future features.
 - Settings: persisted organization name, support email, administrative default language
   and timezone. These defaults do not rewrite patient preferences or treatment schedules.
 - Subscriptions: clearly marked planned; no billing, charging or plan activation.

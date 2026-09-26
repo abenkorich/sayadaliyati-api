@@ -1,3 +1,5 @@
+import { DirectoryController } from './directory/directory.controller.js';
+import { DirectoryService } from './directory/directory.service.js';
 import { AdminController } from './admin/admin.controller.js';
 import { AdminService } from './admin/admin.service.js';
 import { PrescriptionScanController } from './prescriptions/scan.controller.js';
@@ -44,6 +46,7 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        DirectoryController,
         AdminController,
         PrescriptionScanController,
         DocumentsController,
@@ -59,6 +62,7 @@ export class AppModule {
         PrescriptionsController,
       ],
       providers: [
+        DirectoryService,
         AdminService,
         PrescriptionScanService,
         { provide: API_CONFIG, useValue: config },

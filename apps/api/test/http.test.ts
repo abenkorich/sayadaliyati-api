@@ -136,3 +136,11 @@ test('request correlation IDs are server-generated and distinct', async () => {
   await first.arrayBuffer();
   await second.arrayBuffer();
 });
+
+test('healthcare directories require authentication', async () => {
+  for (const kind of ['hospitals', 'pharmacies', 'doctors']) {
+    const response = await fetch(`${baseUrl}/api/v1/directory/${kind}`);
+    assert.equal(response.status, 401);
+    await response.arrayBuffer();
+  }
+});
