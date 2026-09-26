@@ -13,7 +13,7 @@ export const AUTH_ERRORS = {
   ],
   PRESCRIPTION_SCAN_FAILED: [
     502,
-    'Prescription extraction failed. Try a clearer crop or enter details manually.',
+    'The AI service could not complete extraction. Try again later or enter details manually.',
   ],
   AUTH_REQUIRED: [401, 'Authentication is required.'],
   AUTH_INVALID_CREDENTIALS: [401, 'Invalid credentials.'],
