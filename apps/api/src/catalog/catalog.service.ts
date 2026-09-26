@@ -11,6 +11,9 @@ export class CatalogService {
   search(query: MedicineQuery) {
     return this.repository.search(query);
   }
+  async categories() {
+    return { data: await this.repository.categories(), meta: {} };
+  }
   async detail(id: string) {
     return this.envelope(await this.repository.byId(id));
   }

@@ -2,7 +2,7 @@ import { planImport } from './miph-plan.mjs';
 
 /**
  * @param {string} connection
- * @param {string | undefined} target
+ * @param {string} [target]
  */
 export function assertImportTarget(connection, target) {
   const url = new URL(connection);
@@ -10,7 +10,10 @@ export function assertImportTarget(connection, target) {
     throw new Error('PostgreSQL connection required.');
   if (target !== undefined) {
     const actual = `${url.hostname}:${url.port || '5432'}${url.pathname}`;
-    if (target !== actual) throw new Error('Import target does not match the configured connection.');
+    if (target !== actual)
+      throw new Error(
+        'Import target does not match the configured connection.',
+      );
     return;
   }
   assertLocalImport(connection);

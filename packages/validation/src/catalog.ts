@@ -27,6 +27,9 @@ export const medicineQuerySchema = z
       .optional(),
     page: pageNumber(10000, '1'),
     limit: pageNumber(100, '20'),
+    category: z
+      .union([medicineIdSchema, z.literal('uncategorized')])
+      .optional(),
     ingredient: medicineIdSchema.optional(),
     manufacturer: medicineIdSchema.optional(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).default('ACTIVE'),

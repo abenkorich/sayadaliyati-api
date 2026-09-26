@@ -14,6 +14,11 @@ const summary = object({
   genericName: text,
   strength: text,
   dosageForm: text,
+  boxImageUrl: { ...text, format: 'uri' },
+  category: {
+    ...object({ id: uuid, slug: { type: 'string' }, name: { type: 'string' } }),
+    nullable: true,
+  },
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'] },
   manufacturer: {
     ...object({ id: uuid, name: { type: 'string' } }),

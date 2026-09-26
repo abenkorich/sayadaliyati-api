@@ -1,3 +1,7 @@
+import { AdminController } from './admin/admin.controller.js';
+import { AdminService } from './admin/admin.service.js';
+import { PrescriptionScanController } from './prescriptions/scan.controller.js';
+import { PrescriptionScanService } from './prescriptions/scan.service.js';
 import { NotificationInboxController } from './notifications/inbox.controller.js';
 import { NotificationInbox } from './notifications/inbox.service.js';
 import {
@@ -40,6 +44,8 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        AdminController,
+        PrescriptionScanController,
         DocumentsController,
         NotificationPreferencesController,
         TreatmentsController,
@@ -53,6 +59,8 @@ export class AppModule {
         PrescriptionsController,
       ],
       providers: [
+        AdminService,
+        PrescriptionScanService,
         { provide: API_CONFIG, useValue: config },
         DocumentStorage,
         DocumentsService,

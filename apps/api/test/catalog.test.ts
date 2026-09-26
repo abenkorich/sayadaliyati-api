@@ -46,3 +46,24 @@ test('barcode validation preserves leading zeros and case without guessing barco
     assert.equal(barcodeSchema.safeParse(value).success, false);
   }
 });
+
+test('category filtering accepts a category UUID or explicit uncategorized, rejects arbitrary input', () => {
+  assert.equal(
+    medicineQuerySchema.parse({ category: 'uncategorized' }).category,
+    'uncategorized',
+  );
+  assert.equal(
+    medicineQuerySchema.parse({
+      category: '11111111-1111-4111-8111-111111111111',
+    }).category,
+    '11111111-1111-4111-8111-111111111111',
+  );
+  assert.equal(
+    medicineQuerySchema.safeParse({ category: 'allergy' }).success,
+    false,
+  );
+  assert.equal(
+    medicineQuerySchema.safeParse({ category: ['uncategorized'] }).success,
+    false,
+  );
+});

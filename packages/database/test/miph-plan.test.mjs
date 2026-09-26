@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { planImport } from '../scripts/miph-plan.mjs';
-import { assertLocalImport } from '../scripts/miph-database.mjs';
+import {
+  assertLocalImport,
+  assertImportTarget,
+} from '../scripts/miph-database.mjs';
 
 test('publication guard restricts writes to known local databases', () => {
   assert.doesNotThrow(() =>
@@ -78,4 +81,16 @@ test('explicit regulatory change updates status; absence only requests review', 
       action: 'review',
     },
   ]);
+});
+
+test('remote apply requires an exact explicit target', () => {
+  const remote = 'postgres://user:secret@dev.example.com:5432/postgres';
+  assert.throws(() => assertImportTarget(remote));
+  assert.throws(() =>
+    assertImportTarget(remote, 'other.example.com:5432/postgres'),
+  );
+  assert.throws(() => assertImportTarget(remote, 'dev.example.com:5432/other'));
+  assert.doesNotThrow(() =>
+    assertImportTarget(remote, 'dev.example.com:5432/postgres'),
+  );
 });

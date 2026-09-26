@@ -70,7 +70,8 @@ if (!values.offline) {
     connectionTimeoutMillis: 5000,
   });
   try {
-    if (values.apply) assertImportTarget(connectionString, values['confirm-target']);
+    if (values.apply)
+      assertImportTarget(connectionString, values['confirm-target']);
     await client.connect();
     result = await importDatabase(client, stage, {
       apply: values.apply,

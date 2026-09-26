@@ -5,6 +5,8 @@ import { DatabaseService } from '../database.service.js';
 
 const summary = {
   id: true,
+  boxImageUrl: true,
+  category: { select: { id: true, slug: true, name: true } },
   name: true,
   brandName: true,
   genericName: true,
@@ -56,6 +58,12 @@ export class CatalogRepository {
       : undefined;
     const where: Prisma.MedicineWhereInput = {
       status: query.status,
+      ...(query.category
+        ? {
+            categoryId:
+              query.category === 'uncategorized' ? null : query.category,
+          }
+        : {}),
       ...(query.manufacturer ? { manufacturerId: query.manufacturer } : {}),
       ...(query.ingredient
         ? { ingredients: { some: { ingredientId: query.ingredient } } }
@@ -97,6 +105,12 @@ export class CatalogRepository {
         totalPages: Math.ceil(total / query.limit),
       },
     };
+  }
+  categories() {
+    return this.db.client.medicineCategory.findMany({
+      select: { id: true, slug: true, name: true },
+      orderBy: { name: 'asc' },
+    });
   }
   byId(id: string) {
     return this.db.client.medicine.findUnique({

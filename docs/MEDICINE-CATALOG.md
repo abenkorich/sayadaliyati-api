@@ -113,3 +113,11 @@ installation passed without dependency changes.
 
 The subsequent [patient inventory backend](PATIENT-INVENTORY.md) now implements
 add, list, edit and archive with quantity/unit, batch, expiry and audit history.
+
+## Catalog discovery update
+
+Box-image URLs, therapeutic categories and category filtering are now supported.
+A separate public, rate-limited suggestions route returns up to six active catalog
+identities; the full catalog and category list still require authentication.
+See [CATALOG-DISCOVERY.md](CATALOG-DISCOVERY.md) for API contracts, metadata
+assignment and client release instructions.

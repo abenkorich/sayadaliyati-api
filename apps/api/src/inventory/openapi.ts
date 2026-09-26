@@ -60,6 +60,15 @@ const item = object({
   medicine: object({
     id: uuid,
     name: { type: 'string' },
+    boxImageUrl: { ...nullableText, format: 'uri' },
+    category: {
+      ...object({
+        id: uuid,
+        slug: { type: 'string' },
+        name: { type: 'string' },
+      }),
+      nullable: true,
+    },
     brandName: nullableText,
     genericName: nullableText,
     strength: nullableText,

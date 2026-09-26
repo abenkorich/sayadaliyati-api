@@ -2,7 +2,7 @@
 
 This command extracts the official XLSX, preserves its bytes and original row values,
 and compares proposed medicine records with a read-only database snapshot by default.
-`--apply` imports eligible rows into the local development/test database. Rows with
+`--apply` imports eligible rows into the configured database, with explicit target confirmation required for remote writes. Rows with
 issues remain excluded and are retained in the import snapshot for review.
 
 Requires the project's Node runtime and Python 3 with
@@ -27,8 +27,13 @@ not verified new database identities.
 Run `pnpm db:migrate` before comparing or importing. Add `--apply` to the command
 above to write using `MIGRATION_DATABASE_URL`, with a new output directory.
 Use `--apply --rollback` to exercise the full write transaction without committing.
-Remote databases, unknown database names and production mode are rejected.
-This command is not a production publication mechanism.
+Without an explicit target, writes are restricted to local development/test databases.
+For an authorized remote database, back up the target first and add
+`--confirm-target HOST:PORT/DATABASE` together with `--apply`. The target must
+exactly match `MIGRATION_DATABASE_URL`; it never changes the connection. Preview
+using the same migration connection as `DATABASE_URL` to avoid comparing a different DB.
+The remote flag is explicit authorization to publish eligible rows; all review
+rules still apply. Use `--apply --rollback --confirm-target ...` for a rollback test.
 
 Outputs (ignored by git):
 
@@ -107,3 +112,25 @@ pnpm --filter @saydaliyati/database typecheck
 Tests cover repeated comparisons, duplicate and other-source collisions, identity
 changes, explicit withdrawals, absent records, preservation of raw text, formulas,
 and registration-holder separation.
+
+## Remote development workflow
+
+The root `pnpm db:import-miph` command loads the active repository's `.env`.
+Run `pnpm db:migrate`, then invoke the importer with the source, version, URL and
+new output directory shown above. Use the explicit remote target for writes.
+Keep backups and reports under gitignored `import-artifacts/`. The source snapshot
+and import report also persist transactionally in `medicine_imports`.
+
+## Remote dev import completed
+
+The maintained saydaliyati-api repository applied migration
+`20260925000400_miph_import` to its configured remote PostgreSQL development
+database, then imported 8,806 records (5,081 current, 1,313 non-renewed,
+2,412 withdrawn). Another 789 source rows remain in review.
+
+A PostgreSQL 18 custom-format backup was saved before migration at
+`import-artifacts/remote-backup/before-miph.dump` and its archive index was verified.
+The dry-run, rollback-test and committed reports are in
+`import-artifacts/remote-miph-preview/`, `remote-miph-rollback/` and
+`remote-miph-apply/`, respectively. The remote snapshot and audit history are stored
+in `medicine_imports` and `audit_logs`.

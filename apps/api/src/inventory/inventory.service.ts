@@ -27,6 +27,8 @@ const selection = {
   medicine: {
     select: {
       id: true,
+      boxImageUrl: true,
+      category: { select: { id: true, slug: true, name: true } },
       name: true,
       brandName: true,
       genericName: true,

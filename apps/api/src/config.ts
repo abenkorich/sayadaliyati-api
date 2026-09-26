@@ -29,6 +29,11 @@ const environmentSchema = z
     DOCUMENT_STORAGE_REGION: z.string().min(1).default('us-east-1'),
     DOCUMENT_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
     DOCUMENT_STORAGE_SECRET_KEY: z.string().min(16).optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    PRESCRIPTION_SCAN_MODEL: z
+      .string()
+      .regex(/^[a-zA-Z0-9._:-]{1,120}$/)
+      .optional(),
     AUTH_SECRET: z.string().regex(/^[0-9a-f]{64}$/),
     REDIS_URL: z
       .string()

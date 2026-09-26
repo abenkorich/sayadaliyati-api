@@ -1,4 +1,12 @@
 export const AUTH_ERRORS = {
+  PRESCRIPTION_SCAN_NOT_CONFIGURED: [
+    503,
+    'Prescription extraction is not configured.',
+  ],
+  PRESCRIPTION_SCAN_FAILED: [
+    502,
+    'Prescription extraction failed. Try a clearer crop or enter details manually.',
+  ],
   AUTH_REQUIRED: [401, 'Authentication is required.'],
   AUTH_INVALID_CREDENTIALS: [401, 'Invalid credentials.'],
   AUTH_SESSION_EXPIRED: [401, 'Session expired.'],

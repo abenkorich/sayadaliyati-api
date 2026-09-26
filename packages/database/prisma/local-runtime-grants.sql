@@ -30,4 +30,8 @@ GRANT INSERT (occurrence_id, patient_id, treatment_medication_id, scheduled_at, 
 GRANT SELECT ON notifications TO saydaliyati_app;
 GRANT INSERT (user_id, occurrence_id, type, title, body, data) ON notifications TO saydaliyati_app;
 GRANT UPDATE (read_at) ON notifications TO saydaliyati_app;
+GRANT SELECT, INSERT, UPDATE ON admin_directory_entries, admin_settings TO saydaliyati_app;
+GRANT UPDATE (status) ON users TO saydaliyati_app;
+GRANT INSERT (name, normalized_name, generic_name, strength, dosage_form, status, source, updated_at) ON medicines TO saydaliyati_app;
+GRANT UPDATE (name, normalized_name, generic_name, strength, dosage_form, status, source, updated_at) ON medicines TO saydaliyati_app;
 COMMIT;
