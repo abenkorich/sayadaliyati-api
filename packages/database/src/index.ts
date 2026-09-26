@@ -25,6 +25,12 @@ export async function isDatabaseReady(client: PrismaClient): Promise<boolean> {
       to_regclass('public.ai_requests') IS NOT NULL AND
       to_regclass('public.users') IS NOT NULL AND
       to_regclass('public.patient_profiles') IS NOT NULL AND
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'patient_profiles'
+          AND column_name = 'scan_processing_consent'
+      ) AND
+      has_column_privilege(current_user, 'public.patient_profiles', 'scan_processing_consent', 'UPDATE') AND
       to_regclass('public.sessions') IS NOT NULL AND
       to_regclass('public.audit_logs') IS NOT NULL AND
       to_regclass('public.medicines') IS NOT NULL AND
