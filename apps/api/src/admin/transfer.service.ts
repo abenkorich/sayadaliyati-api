@@ -1,6 +1,13 @@
+import {
+  medicineTransferSelect as medicineSelect,
+  medicineTransferRow,
+  medicineReferences,
+  medicineReferenceIssues,
+  medicineReadOnly,
+  saveMedicineTransfer,
+} from './medicine-transfer.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { normalizeCatalogText } from '@saydaliyati/validation';
 import type { Prisma } from '@saydaliyati/database';
 import { DatabaseService } from '../database.service.js';
 import { AuthService } from '../auth/auth.service.js';
@@ -17,11 +24,7 @@ import {
   type TransferRow,
   type Issue,
 } from './transfer-format.js';
-import {
-  directorySchema,
-  medicineSchema,
-  settingsSchema,
-} from './admin.schemas.js';
+import { directorySchema, settingsSchema } from './admin.schemas.js';
 const userSelect = {
   id: true,
   email: true,
@@ -30,16 +33,6 @@ const userSelect = {
   status: true,
   createdAt: true,
   lastLoginAt: true,
-  updatedAt: true,
-} as const;
-const medicineSelect = {
-  id: true,
-  name: true,
-  genericName: true,
-  strength: true,
-  dosageForm: true,
-  status: true,
-  source: true,
   updatedAt: true,
 } as const;
 const directorySelect = {
@@ -63,6 +56,7 @@ type Snapshot = {
   data: TransferRow[];
   map: Map<string, TransferRow>;
   hash: string;
+  issues?: Issue[];
 };
 @Injectable()
 export class AdminTransferService {
@@ -120,6 +114,7 @@ export class AdminTransferService {
       actor: string;
       dataset: string;
       hash: string;
+      issues?: Issue[];
       snapshot: string;
       expires: number;
     };
@@ -147,13 +142,13 @@ export class AdminTransferService {
         }),
       );
     else if (dataset === 'medicines')
-      data = plain(
+      data = (
         await tx.medicine.findMany({
           where: { id: { in: ids } },
           select: medicineSelect,
           orderBy: { id: 'asc' },
-        }),
-      );
+        })
+      ).map(medicineTransferRow);
     else if (dataset === 'settings')
       data = plain(
         await tx.adminSettings.findMany({ where: { id: 'platform' } }),
@@ -166,14 +161,17 @@ export class AdminTransferService {
           orderBy: { id: 'asc' },
         }),
       );
+    const references =
+      dataset === 'medicines' ? await medicineReferences(tx, rows, data) : null;
     return {
+      issues: references ? medicineReferenceIssues(rows, references, data) : [],
       data,
       map: new Map(data.map((row) => [row.id!, row])),
-      hash: digest(data),
+      hash: digest([data, references]),
     };
   }
   private plan(dataset: Dataset, rows: TransferRow[], current: Snapshot) {
-    const issues: Issue[] = [];
+    const issues: Issue[] = [...(current.issues ?? [])];
     let creates = 0,
       updates = 0,
       unchanged = 0;
@@ -214,12 +212,27 @@ export class AdminTransferService {
             });
         }
       }
+      if (dataset === 'medicines' && existing)
+        for (const key of medicineReadOnly) {
+          if (key in row && row[key] !== existing[key])
+            issues.push({
+              row: index + 1,
+              field: key,
+              message:
+                'This field is read-only. Keep the exported value or omit the column.',
+            });
+        }
       const changed =
         existing &&
         (dataset === 'users'
           ? row.status !== existing.status
           : columns[dataset]
-              .filter((key) => key !== 'id')
+              .filter(
+                (key) =>
+                  key !== 'id' &&
+                  (dataset !== 'medicines' ||
+                    (key in row && !medicineReadOnly.includes(key))),
+              )
               .some((key) => (row[key] ?? null) !== (existing[key] ?? null)));
       const operation = !existing ? 'create' : changed ? 'update' : 'unchanged';
       operations.push(operation);
@@ -387,24 +400,7 @@ export class AdminTransferService {
       });
       return null;
     }
-    if (dataset === 'medicines') {
-      const data = medicineSchema
-        .extend({ source: medicineSchema.shape.source.nullable() })
-        .parse(fields);
-      const normalizedName = normalizeCatalogText(data.name);
-      if (id) {
-        await tx.medicine.update({
-          where: { id },
-          data: { ...data, normalizedName },
-          select: { id: true },
-        });
-        return id;
-      }
-      const created = await tx.$queryRaw<
-        { id: string }[]
-      >`INSERT INTO medicines (name, normalized_name, generic_name, strength, dosage_form, status, source) VALUES (${data.name}, ${normalizedName}, ${data.genericName}, ${data.strength}, ${data.dosageForm}, ${data.status}::medicine_status, ${data.source}) RETURNING id`;
-      return created[0]!.id;
-    }
+    if (dataset === 'medicines') return saveMedicineTransfer(tx, row);
     const data = directorySchema
       .omit({ countryId: true, wilayaId: true, communeId: true })
       .parse(fields);
@@ -438,7 +434,12 @@ export class AdminTransferService {
           ? { id: '', status: 'ACTIVE' }
           : Object.fromEntries(
               columns[dataset]
-                .filter((key) => key !== 'id')
+                .filter(
+                  (key) =>
+                    key !== 'id' &&
+                    (dataset !== 'medicines' ||
+                      !medicineReadOnly.includes(key)),
+                )
                 .map((key) => [
                   key,
                   ['name', 'source', 'organizationName', 'timezone'].includes(
@@ -485,21 +486,26 @@ export class AdminTransferService {
             }),
           );
         else if (dataset === 'medicines')
-          records = plain(
+          records = (
             await tx.medicine.findMany({
               where: q
                 ? {
                     OR: [
                       { name: { contains: q, mode: 'insensitive' } },
                       { genericName: { contains: q, mode: 'insensitive' } },
+                      {
+                        category: {
+                          name: { contains: q, mode: 'insensitive' },
+                        },
+                      },
                     ],
                   }
                 : {},
               select: medicineSelect,
               orderBy: { id: 'asc' },
               take,
-            }),
-          );
+            })
+          ).map(medicineTransferRow);
         else if (dataset === 'settings')
           records = plain(
             await tx.adminSettings.findMany({ where: { id: 'platform' } }),

@@ -37,4 +37,7 @@ GRANT UPDATE (name, normalized_name, generic_name, strength, dosage_form, status
 GRANT SELECT, INSERT ON admin_transfer_receipts TO saydaliyati_app;
 GRANT SELECT, INSERT, UPDATE ON geo_zones TO saydaliyati_app;
 GRANT SELECT, INSERT, UPDATE ON ai_settings, ai_requests TO saydaliyati_app;
+GRANT SELECT, INSERT ON medicine_categories, manufacturers, active_ingredients TO saydaliyati_app;
+GRANT INSERT, UPDATE ON medicines TO saydaliyati_app;
+GRANT INSERT, DELETE ON medicine_ingredients, medicine_barcodes, medicine_images TO saydaliyati_app;
 COMMIT;

@@ -51,7 +51,20 @@ async function cleanup() {
     await owner.geoZone.deleteMany({
       where: { kind, nameEnglish: { startsWith: users[0] } },
     });
+  const medicineWhere = { medicine: { source: users[0] } };
+  await owner.medicineIngredient.deleteMany({ where: medicineWhere });
+  await owner.medicineBarcode.deleteMany({ where: medicineWhere });
+  await owner.medicineImage.deleteMany({ where: medicineWhere });
   await owner.medicine.deleteMany({ where: { source: users[0] } });
+  await owner.medicineCategory.deleteMany({
+    where: { name: { startsWith: users[0] } },
+  });
+  await owner.manufacturer.deleteMany({
+    where: { name: { startsWith: users[0] } },
+  });
+  await owner.activeIngredient.deleteMany({
+    where: { name: { startsWith: users[0] } },
+  });
   await owner.notificationPreferences.deleteMany({
     where: { userId: { in: users } },
   });
@@ -1031,5 +1044,334 @@ test('AI runtime writes attempts and aggregates paginated history without medica
     await owner.aiRequest.deleteMany({ where: { model } });
     await owner.aiSettings.deleteMany({ where: { id: 'platform' } });
     if (previous) await owner.aiSettings.create({ data: previous });
+  }
+});
+
+test('complete medicine transfers round-trip category, manufacturer, ingredients, barcodes, images and metadata', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const baseRow = {
+    name: users[0] + ' complete',
+    genericName: 'Generic',
+    strength: '500 mg ' + 'x'.repeat(300),
+    dosageForm: 'Tablet',
+    status: 'INACTIVE',
+    source: users[0],
+  };
+  const row = {
+    ...baseRow,
+    brandName: 'Brand',
+    route: 'Oral',
+    packageSize: '20 tablets',
+    categorySlug: `test-${users[0]}`,
+    categoryName: users[0] + ' category',
+    manufacturerName: users[0] + ' laboratory',
+    manufacturerCountry: 'DZ',
+    manufacturerWebsite: 'https://example.test/lab',
+    registrationNumber: 'REG-123',
+    country: 'DZ',
+    description: 'Line 1\nLine 2, العربية',
+    boxImageUrl: 'https://example.test/box.jpg',
+    sourceVersion: '2026',
+    regulatoryStatus: 'CURRENT',
+    registrationHolder: 'Holder',
+    holderCountry: 'DZ',
+    sourceChecksum: 'ab'.repeat(32),
+    sourceUpdatedAt: '2026-01-01T00:00:00.000Z',
+    sourceMetadata: {
+      raw: { CODE: '00001', P1: '', P2: '0' },
+      extra: { nested: true },
+    },
+    ingredients: [
+      {
+        name: users[0] + ' ingredient',
+        description: 'Description',
+        amount: '500.0000',
+        unit: 'mg',
+      },
+    ],
+    barcodes: [
+      { barcode: `001-${users[0]}`, barcodeType: 'OTHER', country: 'DZ' },
+    ],
+    images: [
+      {
+        url: 'https://example.test/box.jpg',
+        imageType: 'FRONT',
+        sortOrder: 0,
+        source: 'manual',
+      },
+    ],
+  };
+  const transfer = async (rows) => {
+    const input = { format: 'json', content: JSON.stringify(rows) };
+    const p = await request(
+      'POST',
+      input,
+      tokens[0],
+      '/transfers/medicines/preview',
+    );
+    assert.equal(p.body.data.valid, true, JSON.stringify(p.body));
+    const a = await request(
+      'POST',
+      { ...input, token: p.body.data.token },
+      tokens[0],
+      '/transfers/medicines/apply',
+    );
+    assert.equal(a.status, 201, JSON.stringify(a.body));
+    return a;
+  };
+  await transfer([row]);
+  let saved = await owner.medicine.findFirst({
+    where: { source: users[0] },
+    include: {
+      category: true,
+      manufacturer: true,
+      ingredients: true,
+      barcodes: true,
+      images: true,
+    },
+  });
+  assert.equal(saved.category.name, row.categoryName);
+  assert.equal(saved.manufacturer.name, row.manufacturerName);
+  assert.equal(saved.ingredients[0].amount.toString(), '500');
+  assert.equal(saved.barcodes[0].barcode, row.barcodes[0].barcode);
+  assert.equal(saved.description, row.description);
+  assert.deepEqual(saved.sourceMetadata, row.sourceMetadata);
+  for (const format of ['json', 'csv']) {
+    const e = await request(
+      'GET',
+      undefined,
+      tokens[0],
+      `/transfers/medicines/export?format=${format}&q=${users[0]}`,
+    );
+    assert.equal(e.status, 200, JSON.stringify(e.body));
+    if (format === 'json') {
+      const record = JSON.parse(e.body.data.content)[0];
+      assert.equal(record.categoryId, saved.categoryId);
+      assert.equal(record.manufacturerCountry, 'DZ');
+      assert.equal(record.images[0].url, row.images[0].url);
+      assert.equal(
+        record.ingredients[0].ingredientId,
+        saved.ingredients[0].ingredientId,
+      );
+      assert.deepEqual(record.sourceMetadata, row.sourceMetadata);
+    }
+    const p = await request(
+      'POST',
+      { format, content: e.body.data.content },
+      tokens[0],
+      '/transfers/medicines/preview',
+    );
+    assert.equal(p.body.data.valid, true, JSON.stringify(p.body));
+    assert.equal(p.body.data.unchanged, 1, JSON.stringify(p.body));
+  }
+  // Old seven-column imports must not erase newly exposed fields or relationships.
+  await transfer([{ ...baseRow, id: saved.id, name: users[0] + ' renamed' }]);
+  saved = await owner.medicine.findUnique({
+    where: { id: saved.id },
+    include: {
+      category: true,
+      ingredients: true,
+      barcodes: true,
+      images: true,
+    },
+  });
+  assert.equal(saved.category.name, row.categoryName);
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.ingredients.length, 1);
+  assert.deepEqual(saved.sourceMetadata, row.sourceMetadata);
+  const copy = {
+    ...row,
+    id: saved.id,
+    name: saved.name,
+    description: 'Changed',
+  };
+  const preview = await request(
+    'POST',
+    { format: 'json', content: JSON.stringify([copy]) },
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(preview.body.data.valid, true, JSON.stringify(preview.body));
+  await owner.medicineCategory.update({
+    where: { id: saved.categoryId },
+    data: { name: users[0] + ' changed category' },
+  });
+  assert.equal(
+    (
+      await request(
+        'POST',
+        {
+          format: 'json',
+          content: JSON.stringify([copy]),
+          token: preview.body.data.token,
+        },
+        tokens[0],
+        '/transfers/medicines/apply',
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await owner.medicine.findUnique({ where: { id: saved.id } })).description,
+    row.description,
+  );
+  const blocked = await request(
+    'POST',
+    {
+      format: 'json',
+      content: JSON.stringify([
+        { ...baseRow, categoryId: randomUUID(), barcodes: row.barcodes },
+      ]),
+    },
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(blocked.body.data.valid, false);
+  assert.ok(blocked.body.data.issues.some((x) => x.field === 'categoryId'));
+  assert.ok(blocked.body.data.issues.some((x) => x.field === 'barcodes'));
+  await transfer([
+    {
+      ...baseRow,
+      id: saved.id,
+      categoryId: null,
+      categoryName: null,
+      categorySlug: null,
+      manufacturerId: null,
+      ingredients: [],
+      images: [],
+      barcodes: [],
+      sourceMetadata: null,
+    },
+  ]);
+  saved = await owner.medicine.findUnique({
+    where: { id: saved.id },
+    include: { ingredients: true, images: true, barcodes: true },
+  });
+  assert.equal(saved.categoryId, null);
+  assert.equal(saved.manufacturerId, null);
+  assert.equal(saved.ingredients.length, 0);
+  assert.equal(saved.barcodes.length, 0);
+  assert.equal(saved.images.length, 0);
+  assert.equal(saved.sourceMetadata, null);
+});
+test('medicine batch shares new vocabulary but refuses conflicting definitions and duplicate barcodes', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const row = {
+    name: users[0] + ' one',
+    genericName: null,
+    strength: null,
+    dosageForm: null,
+    status: 'INACTIVE',
+    source: users[0],
+    categorySlug: `test-${users[0]}`,
+    categoryName: users[0] + ' category',
+    manufacturerName: users[0] + ' maker',
+    ingredients: [{ name: users[0] + ' ingredient', amount: null, unit: null }],
+  };
+  const input = {
+    format: 'json',
+    content: JSON.stringify([row, { ...row, name: users[0] + ' two' }]),
+  };
+  let p = await request(
+    'POST',
+    input,
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(p.body.data.valid, true, JSON.stringify(p.body));
+  let a = await request(
+    'POST',
+    { ...input, token: p.body.data.token },
+    tokens[0],
+    '/transfers/medicines/apply',
+  );
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  assert.equal(a.body.data.applied, 2);
+  assert.equal(
+    await owner.medicineCategory.count({ where: { slug: row.categorySlug } }),
+    1,
+  );
+  assert.equal(
+    await owner.manufacturer.count({ where: { name: row.manufacturerName } }),
+    1,
+  );
+  assert.equal(
+    await owner.activeIngredient.count({
+      where: { name: row.ingredients[0].name },
+    }),
+    1,
+  );
+  const conflict = {
+    ...row,
+    categorySlug: `new-${users[0]}`,
+    categoryName: 'First',
+  };
+  p = await request(
+    'POST',
+    {
+      format: 'json',
+      content: JSON.stringify([
+        conflict,
+        { ...conflict, name: users[0] + ' other', categoryName: 'Second' },
+      ]),
+    },
+    tokens[0],
+    '/transfers/medicines/preview',
+  );
+  assert.equal(p.body.data.valid, false);
+  assert.equal(
+    await owner.medicineCategory.count({
+      where: { slug: conflict.categorySlug },
+    }),
+    0,
+  );
+});
+
+test('medicine preview respects preserved regulatory status and existing MIPH registration numbers', async () => {
+  await owner.user.update({ where: { id: users[0] }, data: { role: 'ADMIN' } });
+  const m = await owner.medicine.create({
+    data: {
+      name: users[0] + ' regulatory',
+      normalizedName: 'test',
+      source: 'MIPH',
+      registrationNumber: users[0],
+      status: 'INACTIVE',
+      regulatoryStatus: 'WITHDRAWN',
+    },
+  });
+  try {
+    const row = {
+      id: m.id,
+      name: m.name,
+      genericName: null,
+      strength: null,
+      dosageForm: null,
+      status: 'ACTIVE',
+      source: 'MIPH',
+    };
+    let p = await request(
+      'POST',
+      { format: 'json', content: JSON.stringify([row]) },
+      tokens[0],
+      '/transfers/medicines/preview',
+    );
+    assert.equal(p.body.data.valid, false);
+    assert.ok(p.body.data.issues.some((i) => i.field === 'status'));
+    const copy = { ...row, id: undefined };
+    p = await request(
+      'POST',
+      {
+        format: 'json',
+        content: JSON.stringify([
+          { ...copy, status: 'INACTIVE', registrationNumber: users[0] },
+        ]),
+      },
+      tokens[0],
+      '/transfers/medicines/preview',
+    );
+    assert.equal(p.body.data.valid, false);
+    assert.ok(p.body.data.issues.some((i) => i.field === 'registrationNumber'));
+  } finally {
+    await owner.medicine.delete({ where: { id: m.id } });
   }
 });

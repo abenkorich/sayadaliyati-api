@@ -59,7 +59,7 @@ export class AdminTransferController {
   @ApiOperation({
     summary: 'Export managed admin fields or download an import template',
     description:
-      'Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Actual data exports are audited.',
+      'Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Medicine exports include category, manufacturer, regulatory/source details, ingredients, barcodes and images. Structured fields are native JSON in JSON exports and JSON-encoded cells in CSV. Actual data exports are audited.',
   })
   @ApiQuery({ name: 'format', enum: ['json', 'csv'], required: true })
   @ApiQuery({ name: 'q', required: false, type: String })

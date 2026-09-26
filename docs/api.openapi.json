@@ -491,7 +491,7 @@
     },
     "/api/v1/admin/transfers/{dataset}/export": {
       "get": {
-        "description": "Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Actual data exports are audited.",
+        "description": "Returns a JSON envelope containing filename, content and count. Maximum 50,000 records; use q to narrow the export. Medicine exports include category, manufacturer, regulatory/source details, ingredients, barcodes and images. Structured fields are native JSON in JSON exports and JSON-encoded cells in CSV. Actual data exports are audited.",
         "operationId": "AdminTransferController_export",
         "parameters": [
           {

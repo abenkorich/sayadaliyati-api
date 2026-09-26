@@ -28,7 +28,12 @@ test('JSON and CSV round-trip Unicode, quotes, commas, multiline fields and opti
       serialize('medicines', format, [medicine]),
     );
     assert.deepEqual(parsed.issues, []);
-    assert.deepEqual(JSON.parse(JSON.stringify(parsed.rows)), [medicine]);
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.keys(medicine).map((k) => [k, parsed.rows[0]?.[k]]),
+      ),
+      medicine,
+    );
   }
   assert.deepEqual(parseCsv('\uFEFFa,b\r\n"x,y","line 1\nline 2"\r\n'), [
     ['a', 'b'],
@@ -165,4 +170,108 @@ test('all transfer operations reject non-admin actors before database access', a
       { message: 'Access is denied.' },
     );
   }
+});
+
+test('full medicine JSON and CSV retain category, lists, metadata and long details', () => {
+  const native = {
+    ...medicine,
+    brandName: 'Brand',
+    strength: 'x'.repeat(500),
+    packageSize: 'Box of 20',
+    categoryId: null,
+    categorySlug: 'pain-relief',
+    categoryName: 'Pain relief',
+    manufacturerId: null,
+    manufacturerName: 'Lab',
+    manufacturerCountry: 'DZ',
+    manufacturerWebsite: 'https://example.test',
+    boxImageUrl: 'https://example.test/box.jpg',
+    sourceMetadata: {
+      raw: { 'Original column': 'Échantillon, الجزائر', quantity: 0 },
+      flags: [true, null],
+    },
+    ingredients: [
+      { name: 'Ingredient', description: null, amount: '12.5000', unit: 'mg' },
+    ],
+    barcodes: [
+      { barcode: '0012345678901', barcodeType: 'EAN13', country: 'DZ' },
+    ],
+    images: [
+      {
+        url: 'https://example.test/box.jpg',
+        imageType: 'FRONT',
+        sortOrder: 0,
+        source: null,
+      },
+    ],
+  };
+  const parsed = parseTransfer('medicines', 'json', JSON.stringify([native]));
+  assert.deepEqual(parsed.issues, []);
+  for (const format of ['json', 'csv'] as const) {
+    const content = serialize('medicines', format, parsed.rows);
+    const again = parseTransfer('medicines', format, content);
+    assert.deepEqual(again.issues, []);
+    for (const key of Object.keys(native))
+      assert.equal(again.rows[0]?.[key], parsed.rows[0]?.[key]);
+  }
+  const exported = JSON.parse(serialize('medicines', 'json', parsed.rows))[0];
+  assert.equal(exported.categorySlug, 'pain-relief');
+  assert.equal(exported.barcodes[0].barcode, '0012345678901');
+  assert.equal(exported.ingredients[0].amount, '12.5');
+  assert.equal(exported.sourceMetadata.raw.quantity, 0);
+  const old = parseTransfer(
+    'medicines',
+    'csv',
+    'name,genericName,strength,dosageForm,status,source\nLegacy,,,,INACTIVE,manual\n',
+  );
+  assert.deepEqual(old.issues, []);
+  assert.equal('categoryId' in old.rows[0]!, false);
+  assert.equal('ingredients' in old.rows[0]!, false);
+});
+test('medicine detail validation rejects invalid JSON cells, unsafe URLs, duplicate relations and malformed amounts', () => {
+  for (const extra of [
+    { regulatoryStatus: 'REGISTERED' },
+    {
+      images: [
+        {
+          url: 'http://example.test/x',
+          imageType: 'FRONT',
+          sortOrder: 0,
+          source: null,
+        },
+      ],
+    },
+    { boxImageUrl: 'javascript:alert(1)' },
+    {
+      barcodes: [
+        { barcode: 'with spaces', barcodeType: 'OTHER', country: null },
+      ],
+    },
+    { ingredients: [{ name: 'Test', amount: '0.00001', unit: 'mg' }] },
+    { sourceMetadata: '{broken' },
+    { images: 'not-json' },
+    { categoryId: 'bad' },
+    {
+      ingredients: [
+        { name: 'A', amount: null, unit: null },
+        { name: 'A', amount: null, unit: null },
+      ],
+    },
+  ])
+    assert.ok(
+      parseTransfer(
+        'medicines',
+        'json',
+        JSON.stringify([{ ...medicine, ...extra }]),
+      ).issues.length,
+      JSON.stringify(extra),
+    );
+});
+
+test('blank CSV read-only columns are omitted and do not block existing medicine updates', () => {
+  const content = `id,name,genericName,strength,dosageForm,status,source,createdAt,updatedAt,normalizedName\n${randomUUID()},Example,,,,INACTIVE,manual,,,\n`;
+  const result = parseTransfer('medicines', 'csv', content);
+  assert.deepEqual(result.issues, []);
+  for (const key of ['createdAt', 'updatedAt', 'normalizedName'])
+    assert.equal(key in result.rows[0]!, false);
 });

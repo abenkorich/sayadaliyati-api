@@ -1,9 +1,10 @@
-import { z } from 'zod';
 import {
-  directorySchema,
-  medicineSchema,
-  settingsSchema,
-} from './admin.schemas.js';
+  medicineColumns,
+  medicineJsonColumns,
+  medicineTransferSchema,
+} from './medicine-transfer.js';
+import { z } from 'zod';
+import { directorySchema, settingsSchema } from './admin.schemas.js';
 export const datasetSchema = z.enum([
   'users',
   'medicines',
@@ -15,6 +16,7 @@ export const datasetSchema = z.enum([
 export type Dataset = z.infer<typeof datasetSchema>;
 export const formatSchema = z.enum(['json', 'csv']);
 export type Format = z.infer<typeof formatSchema>;
+// Structured medicine values are canonical JSON strings internally; JSON exports restore objects/lists.
 export type TransferRow = Record<string, string | null>;
 export type Issue = { row: number; field: string; message: string };
 export const MAX_FILE_BYTES = 512 * 1024;
@@ -35,15 +37,7 @@ export const exportQuerySchema = z
   .strict();
 export const columns: Record<Dataset, readonly string[]> = {
   users: ['id', 'email', 'phone', 'role', 'status', 'createdAt', 'lastLoginAt'],
-  medicines: [
-    'id',
-    'name',
-    'genericName',
-    'strength',
-    'dosageForm',
-    'status',
-    'source',
-  ],
+  medicines: medicineColumns,
   doctors: [
     'id',
     'name',
@@ -97,12 +91,7 @@ const schemas = {
       lastLoginAt: z.string().nullable().optional(),
     })
     .strict(),
-  medicines: medicineSchema
-    .extend({ id, source: z.string().trim().min(1).max(150).nullable() })
-    .refine((row) => !!row.id || !!row.source, {
-      path: ['source'],
-      message: 'A source is required for a new medicine.',
-    }),
+  medicines: medicineTransferSchema,
   doctors: directorySchema
     .omit({ countryId: true, wilayaId: true, communeId: true })
     .extend({ id }),
@@ -179,7 +168,22 @@ export function serialize(
   rows: TransferRow[],
 ): string {
   return format === 'json'
-    ? JSON.stringify(rows, null, 2) + '\n'
+    ? JSON.stringify(
+        dataset === 'medicines'
+          ? rows.map((row) =>
+              Object.fromEntries(
+                Object.entries(row).map(([key, value]) => [
+                  key,
+                  medicineJsonColumns.includes(key) && value !== null
+                    ? JSON.parse(value)
+                    : value,
+                ]),
+              ),
+            )
+          : rows,
+        null,
+        2,
+      ) + '\n'
     : '\uFEFF' +
         [
           columns[dataset].map(cell).join(','),
@@ -232,6 +236,10 @@ export function parseTransfer(
               header,
               value === ''
                 ? header === 'id' ||
+                  (dataset === 'medicines' &&
+                    ['normalizedName', 'createdAt', 'updatedAt'].includes(
+                      header,
+                    )) ||
                   (dataset === 'users' && header !== 'status')
                   ? undefined
                   : null
@@ -270,7 +278,9 @@ export function parseTransfer(
         });
       return;
     }
-    const data = parsed.data as TransferRow;
+    const data = Object.fromEntries(
+      Object.entries(parsed.data).filter(([, value]) => value !== undefined),
+    ) as TransferRow;
     if (data.id) {
       if (seen.has(data.id))
         issues.push({

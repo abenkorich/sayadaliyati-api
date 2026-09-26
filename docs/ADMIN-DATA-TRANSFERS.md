@@ -7,7 +7,7 @@ complete database backup or export of patient medical records.
 
 ## Export
 
-Choose a dataset and JSON or CSV, optionally filter by medicine/generic name,
+Choose a dataset and JSON or CSV, optionally filter by medicine/generic/category name,
 directory name/city, or user email/phone, then select Download. The export includes
 all matching rows (not just the current admin list page), capped at 50,000 records.
 Larger results produce an explicit error asking for a narrower filter. Empty results
@@ -91,3 +91,92 @@ Verified with Node 24.21.0: 55 API unit tests, 10 admin database integration tes
 30 web unit/session tests (including real local Redis), and 8 admin browser tests
 passed. API/web builds, typechecks, API lint and Prisma validation passed. Web lint
 passed with the existing registration test configuration warning.
+
+## Complete medicine records
+
+Medicine exports now include all catalog details: brand/generic names, strength,
+dosage form, route, packaging, category, manufacturer, registration and regulatory
+fields, country, description, box image, source/version/checksum/date, original
+source metadata, ingredients, barcodes and images. Source metadata preserves every
+original MIPH column under `sourceMetadata.raw`. Patient stock, prescriptions,
+treatments and import-run snapshots are separate datasets and are not included.
+
+Category uses `categoryId`, `categorySlug` and `categoryName`. Assign an existing
+category by ID, slug or unique name; supply its exact descriptors when including
+more than one field. To create a category, leave ID empty and supply both slug and
+name. Existing shared categories are not renamed. Clear all three category fields
+to remove the assignment. Export search also matches category names.
+
+Manufacturer uses `manufacturerId`, `manufacturerName`, `manufacturerCountry` and
+`manufacturerWebsite`. Existing records are selected by ID or a unique normalized
+name; absent names are created. Supplied details must match existing shared records.
+Ingredients similarly use existing IDs or normalized names, creating missing names.
+These rules prevent a medicine import from silently rewriting shared vocabulary.
+
+Structured columns `sourceMetadata`, `ingredients`, `barcodes` and `images` contain
+native objects/lists in JSON. In CSV, put the same JSON into a quoted cell, doubling
+embedded quotes as usual. Start from an export for correct CSV escaping. Example
+JSON medicine (synthetic data):
+
+```json
+[
+  {
+    "name": "Example medicine",
+    "genericName": null,
+    "strength": "10 mg",
+    "dosageForm": "Tablet",
+    "status": "INACTIVE",
+    "source": "manual",
+    "categorySlug": "example-category",
+    "categoryName": "Example category",
+    "manufacturerName": "Example laboratory",
+    "manufacturerCountry": "DZ",
+    "manufacturerWebsite": "https://example.com",
+    "ingredients": [
+      {"name": "Example ingredient", "amount": "10", "unit": "mg"}
+    ],
+    "barcodes": [
+      {"barcode": "0012345678901", "barcodeType": "EAN13", "country": "DZ"}
+    ],
+    "images": [
+      {"url": "https://example.com/box.jpg", "imageType": "FRONT", "sortOrder": 0, "source": "manual"}
+    ],
+    "sourceMetadata": {"raw": {"CODE": "00001", "P1": "", "P2": "0"}}
+  }
+]
+```
+
+Each ingredient can include `ingredientId` and `description`. Amount is a decimal
+string or number, nonnegative, with at most eight integer digits and four decimal
+places. Keep barcodes as strings to preserve leading zeros. Barcode types: EAN13,
+EAN8, UPC, GTIN, QR, OTHER. Image types: FRONT, BACK, SIDE, PACKAGE, OTHER. Image and
+box-image URLs must be HTTPS. Only links are transferred; image files are not
+uploaded or downloaded. Each relation list supports up to 100 entries per medicine.
+
+Optional detail fields/columns omitted from an import preserve existing values.
+Explicit nulls or blank CSV cells clear nullable details; null or `[]` replaces a
+relation list with an empty list. Supplied lists replace that medicine’s links
+atomically. Missing fields default to null or empty lists for new medicines. The
+original seven-column format remains supported and does not erase extended details.
+
+`normalizedName`, `createdAt` and `updatedAt` are exported for reference and read-only.
+For updates, keep exported values unchanged or omit these columns. Empty CSV cells
+in these three columns are ignored. Newly created rows receive server timestamps
+and a derived normalized name. Images/barcode link IDs and relationship timestamps
+are internal identities and are not imported; ingredient IDs refer to shared records.
+
+Regulatory status is null, CURRENT, NOT_RENEWED or WITHDRAWN. WITHDRAWN/NOT_RENEWED
+medicines cannot be ACTIVE, including when regulatory status was omitted and is
+preserved from the existing row. MIPH registration numbers and barcodes must remain
+unique; imports never take barcodes from another medicine. Preview reports unknown
+references, ambiguous names, inconsistent shared definitions and duplicate identifiers.
+Signed previews also bind referenced catalog records; concurrent changes require a
+new preview. All record, relation, shared vocabulary and audit writes are atomic.
+
+Deploy the updated API and web portal and apply
+`20260926000600_full_medicine_transfers` before using extended imports. This migration
+adds catalog permissions for the existing `saydaliyati_app` role, if present. For a
+custom runtime role, apply equivalent SELECT/INSERT grants on categories,
+manufacturers and active ingredients, INSERT/UPDATE on medicines, and INSERT/DELETE
+on medicine ingredients/barcodes/images, in addition to existing SELECT grants.
+No production migration or deployment was performed by this change.
